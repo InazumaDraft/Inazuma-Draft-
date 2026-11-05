@@ -506,7 +506,8 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
 
   var FOTO_DEF = [0, 6, 10, 14, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39];
   var E = { idx: null, fotos: null, caras: {}, hojas: {}, pedido: false, listo: false,
-            fallo: false, seq: 0, banner: null, tick: 0, kits: null };
+            fallo: false, seq: 0, banner: null, tick: 0, kits: null,
+            err: "", pintados: 0, fichas: 0, ultimoUI: 0 };
 
   function M() { var P = window.PARTIDO; return (P && (P.interno || P.M)) || {}; }
 
@@ -540,20 +541,23 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
       jug.forEach(function (c) { if (pack[c]) E.caras[c] = pack[c]; else falta = true; });
       if (!falta) { E.fotos = (window.MUNECO_FOTOS || null); E.listo = true; return; }
     }
-    fetch(BASE + "index.json", { cache: "force-cache" })
+    fetch(BASE + "index.json?v=3", { cache: "force-cache" })
       .then(function (r) { return r.json(); })
       .then(function (ix) {
         E.idx = ix; E.fotos = ix.fotogramas || E.fotos;
         var usados = {}, lista = [];
         jug.forEach(function (c) { var k = ix.chunks[c]; if (k !== undefined && !usados[k]) { usados[k] = 1; lista.push(k); } });
         return Promise.all(lista.map(function (k) {
-          return fetch(BASE + "c" + k + ".json", { cache: "force-cache" })
+          return fetch(BASE + "c" + k + ".json?v=3", { cache: "force-cache" })
             .then(function (r) { return r.json(); })
             .then(function (d) { for (var c in d) E.caras[c] = d[c]; });
         }));
       })
       .then(function () { E.listo = true; })
-      .catch(function () { E.fallo = true; E.pedido = false; });
+      .catch(function (e) {
+        E.fallo = true; E.pedido = false;
+        if (!E.err) E.err = "datos: " + (e && e.message ? e.message : String(e));
+      });
   }
 
   function clave(p) {
@@ -658,7 +662,8 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
     }
 
     var sh = hoja(p);
-    if (!sh) { if (chip) g.drawImage(chip, cx - r, cy - r, r * 2, r * 2); return; }
+    if (!sh) { E.fichas++; if (chip) g.drawImage(chip, cx - r, cy - r, r * 2, r * 2); return; }
+    E.pintados++;
 
     var h = r * ALTO, w = h * 48 / 64;
     var flip = dm[1];
@@ -696,6 +701,31 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
     d.__t = setTimeout(function () { d.style.opacity = "0"; }, 1500);
   }
 
+  function pildora(txt, malo) {
+    var d = document.getElementById("animDiag");
+    if (!d) {
+      d = document.createElement("div");
+      d.id = "animDiag";
+      d.style.cssText = "position:fixed;left:6px;bottom:6px;z-index:9999;font:600 10px/1.25 system-ui,sans-serif;" +
+        "padding:4px 7px;border-radius:5px;pointer-events:none;max-width:70vw;white-space:pre-wrap";
+      document.body.appendChild(d);
+    }
+    d.style.background = malo ? "rgba(120,10,20,.88)" : "rgba(6,20,40,.8)";
+    d.style.color = "#dbeeff";
+    d.textContent = txt;
+  }
+
+  function diagnostico() {
+    var ahora = performance.now();
+    if (ahora - E.ultimoUI < 700) return;
+    E.ultimoUI = ahora;
+    if (E.err) { pildora("muñecos: ERROR " + E.err, true); return; }
+    if (!E.pedido) { pildora("muñecos: sin arrancar", true); return; }
+    var n = Object.keys(E.caras).length;
+    if (!E.listo) { pildora("muñecos: cargando (" + n + " caras)", false); return; }
+    pildora("muñecos: " + n + " caras · " + E.pintados + " dibujados · " + E.fichas + " fichas", false);
+  }
+
   function vigilar() {
     var m = M(), es = m.escena;
     if (!m.on) { var nd = document.getElementById("idCutin"); if (nd) nd.style.opacity = "0"; }
@@ -718,9 +748,11 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
       if (!E.kits) E.kits = window.MUNECO_KITS || null;
       if (!E.pedido) { pedir(); vigilar(); }
       pintar(g, p, cx, cy, r, ahora || performance.now(), chip);
+      diagnostico();
     } catch (e) {
       // ante cualquier fallo, la ficha de siempre: el partido nunca se rompe
       E.fallo = true;
+      if (!E.err) E.err = (e && e.message ? e.message : String(e));
       if (chip) { try { g.drawImage(chip, cx - r, cy - r, r * 2, r * 2); } catch (e2) { } }
     }
   };
