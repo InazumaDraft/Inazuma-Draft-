@@ -540,7 +540,7 @@ function rogueNotify(type, payload = {}) {
 /* =====================================================================
    SPRITES: las hojas se cargan solo cuando hacen falta
    ===================================================================== */
-const DRAFT_GENERIC_PORTRAIT = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill="#e7b895" d="M22 8h20v5h5v20h-5v7H22v-7h-5V13h5z"/><path fill="#26354f" d="M18 13h5V8h18v5h5v9H18z"/><path fill="#376b9f" d="M12 41h40v23H12z"/><path fill="#dbe7f5" d="M22 41h20v6H22z"/><path fill="#19304c" d="M12 58h40v6H12z"/></svg>');
+const DRAFT_GENERIC_SPRITE = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" shape-rendering=\"crispEdges\"><path fill=\"#30394d\" d=\"M19 3h10v3h4v8h-3v4H18v-3h-3V7h4z\"/><path fill=\"#f0bd8a\" d=\"M20 8h9v7h-9zM21 16h7v4h-7z\"/><path fill=\"#c7a94b\" d=\"M19 10h2v2h-2z\"/><path fill=\"#667b96\" d=\"M17 20h15v12h4v5H13v-5h4z\"/><path fill=\"#e4e7e2\" d=\"M22 20h5v3h-5zM18 32h13v5h-5v-3h-4v3h-4z\"/><path fill=\"#33445f\" d=\"M19 37h4v6h-4zM27 37h4v6h-4z\"/><path fill=\"#d7dce1\" d=\"M19 41h4v3h-4zM27 41h4v3h-4z\"/><path fill=\"#243146\" d=\"M17 44h7v3h-8zM26 44h8v3h-8z\"/></svg>");
 const Sprites = (() => {
   const cache = {};
   const img = file => cache[file] || (cache[file] = new Promise((res, rej) => {
@@ -566,7 +566,7 @@ const Sprites = (() => {
     });
     const loaded = await Promise.all(refs.map(async r => {
       const fallbackPortrait = async () => {
-        const sources = [r.customPortrait].concat(r.customFallbacks || [], [DRAFT_GENERIC_PORTRAIT]).filter((src, i, all) => src && all.indexOf(src) === i);
+        const sources = [r.customPortrait].concat(r.customFallbacks || [], [DRAFT_GENERIC_SPRITE]).filter((src, i, all) => src && all.indexOf(src) === i);
         for (const src of sources) { const portrait = await loadPortrait(src); if (portrait) return { image: portrait, portrait: true }; }
         const blank = document.createElement('canvas'); blank.width = blank.height = 48;
         return { image: blank, portrait: true };
@@ -877,7 +877,8 @@ const Logic = (() => {
       ball: { x: cx, y: F.l / 2, z: 0, vx: 0, vy: 0, vz: 0, owner: null, lastTeam: 'A', intended: null, shot: null, fire: null, ang: 0, phase: 0 } };
     for (const team of ['A', 'B']) {
       teams[team].players.forEach((d, i) => {
-        const ai = team === 'B';
+        // En el Draft, los dos lados son CPU: ninguno recibe la ventaja de velocidad del rival.
+      const ai = team === 'B' || !!settings.spectator;
         const home = d.home || BASE[d.role] || [0, F.l / 2], ko = d.ko || [home[0], Math.min(home[1], F.l / 2 - 1)];
         s.players.push(Object.assign({}, d, { id: team + i, team, num: i + 1, home, ko,
           speed: d.speed * (ai ? diff.aiSpeed : 1),
@@ -912,7 +913,7 @@ const Logic = (() => {
     }
     s.tech = null; s.slow = 0; s.shoot.charging = false; s.shoot.charge = 0;
     take(s, tk);
-    s.controlledId = striker(s, 'A').id;
+    s.controlledId = s.settings.spectator ? null : striker(s, 'A').id;
     s.pause = { t: 0.9 };
     s.events.push({ type: 'kickoff' });
   }
@@ -1471,11 +1472,11 @@ const Logic = (() => {
       const gx = cx - fx, gyy = gy - fy, gl = Math.hypot(gx, gyy) || 1;
       moveTo(s, p, fx + gx / gl * 0.6, fy + gyy / gl * 0.6, true);
       if (h.role !== 'POR' && h.invuln <= 0) {
-        const d = dist(p, h), use = p.team === 'B' ? s.diff.techUse : 0.6;
+        const d = dist(p, h), use = (p.team === 'B' || s.settings.spectator) ? s.diff.techUse : 0.6;
         const t = bestTech(p, 'bloqueo');
         if (t && !s.tech && d < 3 && rnd() < use * dt * 1.5) { startTech(s, p, t, 0); return; }
-        const tk = p.team === 'B' ? s.diff.tackle : 0.6;
-        if (d < 2.2 && p.tackleCd <= 0 && rnd() < tk * dt * 2.5) { p.windup = p.team === 'B' ? 0.18 : 0.22; }
+        const tk = (p.team === 'B' || s.settings.spectator) ? s.diff.tackle : 0.6;
+        if (d < 2.2 && p.tackleCd <= 0 && rnd() < tk * dt * 2.5) { p.windup = (p.team === 'B' || s.settings.spectator) ? 0.18 : 0.22; }
       }
       return;
     }
@@ -1485,7 +1486,7 @@ const Logic = (() => {
       moveTo(s, p, h.x + gx / gl * 4, h.y + gyy / gl * 4, true); return;
     }
     const gx = cx - o.x, gyy = gy - o.y, gl = Math.hypot(gx, gyy) || 1;
-    const hm = homeTarget(s, p), sm = p.team === 'B' ? s.diff.smart : 0.8;
+    const hm = homeTarget(s, p), sm = (p.team === 'B' || s.settings.spectator) ? s.diff.smart : 0.8;
     const sideX = o.x + gx / gl * 1.8, sideY = o.y + gyy / gl * 1.8;                 // entre su marca y la portería
     const laneX = o.x + (h.x - o.x) * 0.3, laneY = o.y + (h.y - o.y) * 0.3;          // tapando la línea de pase
     const mx = sideX * (1 - sm * 0.45) + laneX * sm * 0.45, my = sideY * (1 - sm * 0.45) + laneY * sm * 0.45;
@@ -1543,7 +1544,7 @@ const Logic = (() => {
     let near = null, nd = Infinity;
     const opp = s.players.filter(q => q.team !== p.team && q.role !== 'POR' && q.stun <= 0);
     for (const q of opp) { const e = dist(q, p); if (e < nd) { nd = e; near = q; } }
-    const rival = p.team === 'B', smart = rival ? s.diff.smart : 0.8;
+    const rival = p.team === 'B' || s.settings.spectator, smart = rival ? s.diff.smart : 0.8;
     p.think -= dt;
     if (p.think <= 0) {
       p.think = (rival ? s.diff.think : 0.3) * (0.6 + rnd() * 0.8);
@@ -1618,7 +1619,7 @@ const Logic = (() => {
         const t = bestTech(p, 'parada');
         const vy0 = Math.abs(b.vy) > 0.1 ? b.vy : 0.1, tt = (ownGoalY(p.team) - b.y) / vy0;
         const onTarget = tt > 0 && Math.abs(b.x + b.vx * tt - cx) < F.goalW / 2 + 0.6;
-        if (t && onTarget && (b.shot.tech || b.shot.power > p.gk + 4) && (p.team === 'A' || b.shot.tech || rnd() < s.diff.techUse)) {
+        if (t && onTarget && (b.shot.tech || b.shot.power > p.gk + 4) && (s.settings.spectator || p.team === 'A' || b.shot.tech || rnd() < s.diff.techUse)) {
           p.gkTech = t; spend(p, t);
           s.events.push({ type: 'techStart', name: t.name, elem: t.elem, kind: 'parada', team: p.team, id: p.id, quick: true });
           s.slow = Math.max(s.slow, 0.9);
@@ -1634,7 +1635,7 @@ const Logic = (() => {
       p.diving = true; return;
     }
     p.diving = false; p.gkTech = null;
-    p.react = p.team === 'B' ? s.diff.react + 0.05 : 0.09;
+    p.react = (p.team === 'B' || s.settings.spectator) ? s.diff.react + 0.05 : 0.09;
     if (!b.owner && inOwnBox(p.team, b)) {
       const opp = s.players.filter(q => q.team !== p.team).reduce((m, q) => Math.min(m, dist(q, b)), 99);
       if (dist(p, b) < opp) { moveTo(s, p, b.x, b.y, true); return; }
@@ -1789,7 +1790,7 @@ const Logic = (() => {
       const draft = !!s.settings.spectator;
       const defense = draft ? clamp(d.defense + draftSwing(s), 20, 120) : d.defense;
       const control = draft ? clamp(h.control * 0.6 + h.body * 0.4 + draftSwing(s), 20, 120) : h.control * 0.6 + h.body * 0.4;
-      let rate = (d.team === 'B' ? s.diff.steal : 1.1) * (draft ? defense / control : d.defense / (h.control * 0.6 + h.body * 0.4));
+      let rate = ((d.team === 'B' || draft) ? s.diff.steal : 1.1) * (draft ? defense / control : d.defense / (h.control * 0.6 + h.body * 0.4));
       if (behind && hs > 5) rate *= 0.3;
       if (rnd() < rate * dt) {
         h.stun = 0.45; h.kickLock = 0.4;
@@ -6340,6 +6341,39 @@ const App = (() => {
 
 
   const DRAFT_ROLE_MAP = { GK: 'POR', DF: 'DEF', MF: 'MED', FW: 'DEL', PORTERO: 'POR', DELANTERO: 'DEL', MEDIO: 'MED', DEFENSA: 'DEF' };
+  // Kits muestreados de las hojas nativas Rogue; donde existe TEAM.kit se prioriza ese dato original.
+  const DRAFT_ROGUE_KITS = Object.freeze({
+    Occult: { a: '#8B5AAC', b: '#838B8B' }, Wild: { a: '#52A44A', b: '#314A39' },
+    Brain: { a: '#A4734A', b: '#735A4A' }, Otaku: { a: '#314AB4', b: '#B47383' },
+    Shuriken: { a: '#7B4194', b: '#52295A' }, Farm: { a: '#E6C59C', b: '#7B5A31' },
+    Kirkwood: { a: '#D5C5B4', b: '#BD1010' }, 'Royal Academy': { a: '#39624A', b: '#523918' },
+    Zeus: { a: '#D5BDAC', b: '#8B7B6A' },
+    'Inazuma Kids FC': { a: '#E63931', b: '#523918' }, Sallys: { a: '#D5B410', b: '#205231' },
+    Umbrella: { a: '#DED5BD', b: '#294A6A' }, Veteranos: { a: '#414141', b: '#313131' },
+    'Tanques Centella': { a: '#FFD500', b: '#201829' }, 'Ultra Zeus': { a: '#6A6273', b: '#413931' },
+    Airosos: { a: '#315A83', b: '#183962' }, Guardabosques: { a: '#106231', b: '#39527B' },
+    Ardientes: { a: '#838373', b: '#393939' }, Montañeros: { a: '#296A31', b: '#393939' },
+    'Pistolas Centella': { a: '#202039', b: '#201829' }, 'Bombas Centella': { a: '#FFD500', b: '#313152' },
+    'Cohetes Centella': { a: '#106231', b: '#5A4131' }, 'Jets Centella': { a: '#292941', b: '#313152' },
+    'Tormenta de Géminis': { a: '#D5D5CD', b: '#7B837B' }, Alpino: { a: '#F6F6E6', b: '#4A398B' },
+    'Épsilon': { a: '#E6E6E6', b: '#DE399C' }, 'Claustro Sagrado': { a: '#A49C73', b: '#394131' },
+    Fauxshore: { a: '#F6CD20', b: '#A48310' }, 'Royal Academy Redux': { a: '#CD1818', b: '#941010' },
+    'Épsilon Plus': { a: '#4A7300', b: '#314A00' }, 'Emperadores Oscuros': { a: '#837BC5', b: '#5A5294' },
+    'Génesis': { a: '#D5D5C5', b: '#39415A' }, Prominence: { a: '#D5B410', b: '#39527B' },
+    'Polvo de Diamantes': { a: '#D5B410', b: '#39527B' }, Caos: { a: '#F66A00', b: '#B49C8B' }
+  });
+  const draftFallbackSprite = kit => {
+    const valid = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
+    const a = valid(kit && kit.a, '#667b96'), b = valid(kit && kit.b, '#33445f');
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" shape-rendering="crispEdges">'
+      + '<path fill="#30394d" d="M19 3h10v3h4v8h-3v4H18v-3h-3V7h4z"/>'
+      + '<path fill="#f0bd8a" d="M20 8h9v7h-9zM21 16h7v4h-7z"/><path fill="#c7a94b" d="M19 10h2v2h-2z"/>'
+      + '<path fill="' + a + '" d="M17 20h15v12h4v5H13v-5h4z"/>'
+      + '<path fill="#e4e7e2" d="M22 20h5v3h-5zM18 32h13v5h-5v-3h-4v3h-4z"/>'
+      + '<path fill="' + b + '" d="M19 37h4v6h-4zM27 37h4v6h-4zM17 44h7v3h-8zM26 44h8v3h-8z"/>'
+      + '<path fill="#d7dce1" d="M19 41h4v3h-4zM27 41h4v3h-4z"/></svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  };
   const draftNorm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   function draftIdentityMatch(name, player) {
     const target = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -6395,36 +6429,71 @@ const App = (() => {
     if (out.length !== 11) throw new Error('No se pudo completar el once de ' + (team.name || '') + '.');
     return out;
   }
-  function draftTemplatePlayer(role) {
-    return GAME.players.find(p => p.cs && p.role === role) || GAME.players.find(p => p.cs) || null;
+  function draftTemplatePlayer(role, used) {
+    const pool = GAME.players.filter(p => p.cs);
+    const available = p => {
+      const ref = Sprites.refOf(p), key = String(ref.file) + ':' + Number(ref.row);
+      return !(used && used.ids.has(Number(p.id))) && !(used && used.refs.has(key));
+    };
+    return pool.find(p => p.role === role && available(p)) || pool.find(available)
+      || pool.find(p => p.role === role) || pool[0] || null;
   }
-  function buildDraftRogueTeam(team, side) {
+  function buildDraftRogueTeam(team, side, sharedAssets) {
     const chosen = draftPickEleven(team);
     const roles = chosen.map(x => x.role);
     const positions = layout(roles);
     const rogueTeam = TEAM(draftTeamKey(team, side));
-    const nativeKit = rogueTeam && rogueTeam.kit;
+    const draftId = String(team.id || '').toLowerCase();
+    const nativeKit = draftId === 'raimon' ? null : (rogueTeam && (rogueTeam.kit || DRAFT_ROGUE_KITS[rogueTeam.key])) || null;
+    const usedAssets = sharedAssets || { ids: new Set(), refs: new Set() };
+    const nativeMembers = draftId === 'raimon' ? new Map() : new Map((rogueTeam && rogueTeam.players || []).map(m => [Number(m.id), m]));
     const players = chosen.map(({ record, role }, i) => {
       let pd = draftPlayerFor(record, role);
-      const mapped = !!(pd && pd.cs);
-      if (!mapped) pd = draftTemplatePlayer(role);
-      if (!pd || !pd.cs) throw new Error('No se encontró un perfil Rogue base para ' + (record.name || role));
-      const sprite = Object.assign({}, Sprites.refOf(pd));
-      if (!mapped) {
-        sprite.customPortrait = record.faceImage || DRAFT_GENERIC_PORTRAIT;
-        sprite.customFallbacks = [record.faceImage].filter(Boolean);
-      } else {
-        sprite.customFallbacks = [record.faceImage].filter(Boolean);
-        // No sobrescribe la equipación original con los colores asignados por el Draft.
-        if (role !== 'POR' && nativeKit) sprite.kit = Object.assign({}, nativeKit);
+      let mapped = !!(pd && pd.cs);
+      if (mapped) {
+        const mappedRef = Sprites.refOf(pd), mappedKey = String(mappedRef.file) + ':' + Number(mappedRef.row);
+        if (usedAssets.ids.has(Number(pd.id)) || usedAssets.refs.has(mappedKey)) mapped = false;
       }
+      if (!mapped) pd = draftTemplatePlayer(role, usedAssets);
+      if (!pd || !pd.cs) throw new Error('No se encontró un perfil Rogue base para ' + (record.name || role));
+      const native = mapped ? nativeMembers.get(Number(pd.id)) : null;
+      let teamKeeper = draftId !== 'raimon' && !native && role === 'POR' && rogueTeam ? rogueTeam.players.find(m => m.role === 'POR') : null;
+      let teamSprite = native && native.file ? native : teamKeeper && teamKeeper.file ? teamKeeper : null;
+      if (teamSprite && usedAssets.refs.has(String(teamSprite.file) + ':' + Number(teamSprite.row))) teamSprite = null;
+      const sprite = teamSprite
+        ? { file: String(teamSprite.file), row: Number(teamSprite.row) || 0 }
+        : Object.assign({}, Sprites.refOf(pd));
+      const spriteRefKey = String(sprite.file) + ':' + Number(sprite.row);
+      usedAssets.ids.add(Number(pd.id));
+      if (teamSprite === native && native) usedAssets.ids.add(Number(native.id));
+      if (teamSprite === teamKeeper && teamKeeper) usedAssets.ids.add(Number(teamKeeper.id));
+      usedAssets.refs.add(spriteRefKey);
+      // Las filas Rogue nativas conservan su uniforme; los sprites de colección reciben el kit de su equipo.
+      const hasNativeKit = !!(rogueTeam && rogueTeam.kit);
+      if (role !== 'POR' && nativeKit && (/^c\d+\.png$/i.test(sprite.file) || (hasNativeKit && /^r\d+\.png$/i.test(sprite.file)))) {
+        sprite.kit = Object.assign({}, nativeKit);
+      }
+      // Si faltase una hoja, usar un muñeco entero y vestirlo con los colores de este equipo.
+      const fallbackKit = nativeKit || (draftId === 'raimon' ? { a: '#D5B410', b: '#39527B' } : null);
+      sprite.customFallbacks = [draftFallbackSprite(fallbackKit), DRAFT_GENERIC_SPRITE];
       const rating = Number(record.rating) || Number(record.med) || 70;
+      const draftStats = record.draftStats && typeof record.draftStats === 'object' ? record.draftStats : {};
       const stat = key => {
         const base = Number(pd.ie && pd.ie[key]);
-        return Math.round(mapped ? (base || rating) : (base ? base * 0.6 + rating * 0.4 : rating));
+        const draftValue = key === 'tiro' ? Number(draftStats.tir)
+          : key === 'control' ? Number(draftStats.reg)
+          : key === 'defensa' ? Number(draftStats.rob)
+          : key === 'rapidez' ? Number(draftStats.vel) : NaN;
+        if (Number.isFinite(draftValue) && draftValue > 0) return Math.round(draftValue * 0.7 + rating * 0.3);
+        return Math.round(base ? base * 0.45 + rating * 0.55 : rating);
       };
       const techs = mapped ? startingTechs(pd) : [];
       const matchPlayer = buildMatchPlayer(pd.id, role, stat, techs, [], side * 11 + i, positions[i]);
+      matchPlayer.stamDrain = +(1.3 - rating / 200).toFixed(2);
+      if (role === 'POR') {
+        const keeperRating = Number(draftStats.ata) || rating;
+        matchPlayer.gk = Math.round(keeperRating * 0.7 + rating * 0.3);
+      }
       matchPlayer.key = String(record.face || record.name || ('draft-' + side + '-' + i));
       matchPlayer.name = String(record.name || pd.name || 'Jugador');
       matchPlayer.sprite = sprite;
@@ -6442,8 +6511,9 @@ const App = (() => {
     api.draftDifficulty = payload.difficulty || 'medio';
     api.match = null; api.matchSheet = null; api.running = false;
     try {
-      const A = buildDraftRogueTeam(payload.teams.A, 0);
-      const B = buildDraftRogueTeam(payload.teams.B, 1);
+      const usedAssets = { ids: new Set(), refs: new Set() };
+      const A = buildDraftRogueTeam(payload.teams.A, 0, usedAssets);
+      const B = buildDraftRogueTeam(payload.teams.B, 1, usedAssets);
       const rivalKey = draftTeamKey(payload.teams.B, 1);
       await startMatch({ A, B }, !!payload.golden, payload.field || TEAM_FIELD[rivalKey] || 'normal', 'match', null);
       if (!api.match) throw new Error('No se pudieron cargar los sprites del partido.');

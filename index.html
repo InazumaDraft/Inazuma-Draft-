@@ -515,7 +515,7 @@ async function iniciarRogueMatch(homeId,awayId){
     var team=M.equipos[index]||{},once=team.once||[];
     var players=once.map(function(p,i){
       var face=String(p.cara||p.c||p.face||''),role=String(p.pos||p.role||'MED');
-      return {name:String(p.n||p.nombre||p.corto||('Jugador '+(i+1))),face:face,faceImage:CARAS[face]||'',role:role,rating:Number(p.med)||0};
+      return {name:String(p.n||p.nombre||p.corto||('Jugador '+(i+1))),face:face,faceImage:CARAS[face]||'',role:role,rating:Number(p.med)||0,draftStats:p.rat&&typeof p.rat==='object'?Object.assign({},p.rat):{}};
     });
     return {id:String(team.id||''),name:String(team.nombre||team.corto||'Equipo Draft'),crest:EMBLEMS[team.emblema]||'',players:players};
   }
