@@ -540,6 +540,7 @@ function rogueNotify(type, payload = {}) {
 /* =====================================================================
    SPRITES: las hojas se cargan solo cuando hacen falta
    ===================================================================== */
+const DRAFT_GENERIC_PORTRAIT = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill="#e7b895" d="M22 8h20v5h5v20h-5v7H22v-7h-5V13h5z"/><path fill="#26354f" d="M18 13h5V8h18v5h5v9H18z"/><path fill="#376b9f" d="M12 41h40v23H12z"/><path fill="#dbe7f5" d="M22 41h20v6H22z"/><path fill="#19304c" d="M12 58h40v6H12z"/></svg>');
 const Sprites = (() => {
   const cache = {};
   const img = file => cache[file] || (cache[file] = new Promise((res, rej) => {
@@ -564,15 +565,15 @@ const Sprites = (() => {
       const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null); image.src = src;
     });
     const loaded = await Promise.all(refs.map(async r => {
-      if (r.customPortrait) {
+      const fallbackPortrait = async () => {
         const sources = [r.customPortrait].concat(r.customFallbacks || [], [DRAFT_GENERIC_PORTRAIT]).filter((src, i, all) => src && all.indexOf(src) === i);
         for (const src of sources) { const portrait = await loadPortrait(src); if (portrait) return { image: portrait, portrait: true }; }
-        const generic = await loadPortrait(DRAFT_GENERIC_PORTRAIT);
-        if (generic) return { image: generic, portrait: true };
         const blank = document.createElement('canvas'); blank.width = blank.height = 48;
         return { image: blank, portrait: true };
-      }
-      return { image: await img(r.file), portrait: false };
+      };
+      if (r.customPortrait) return fallbackPortrait();
+      try { return { image: await img(r.file), portrait: false }; }
+      catch (error) { if (!ROGUE_EMBED) throw error; return fallbackPortrait(); }
     }));
     const w = 48 * GAME.frames.length;
     const c = document.createElement('canvas');
@@ -839,6 +840,8 @@ const Logic = (() => {
   let cx = F.w / 2;
   const rnd = Math.random;
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  // Solo el partido integrado del Draft (modo espectador) usa más varianza en los duelos.
+  const draftSwing = s => s.settings && s.settings.spectator ? (rnd() - 0.5) * 24 : 0;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const snap8 = a => Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
   const angDiff = (a, b) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
@@ -956,11 +959,12 @@ const Logic = (() => {
   }
 
   /* ---------- Acciones con balón ---------- */
-  function pass(s, p, kind, dir, power = 0) {
+  function pass(s, p, kind, dir, power = 0, targetId = null) {
     const mates = s.players.filter(m => m.team === p.team && m !== p && m.role !== 'POR');
     const aim = dir && Math.hypot(dir.x, dir.y) > 0.3 ? Math.atan2(dir.y, dir.x) : p.aim;
-    let best = null, bestScore = Infinity;
-    for (const m of mates) {
+    let best = targetId != null ? mates.find(m => m.id === targetId && dist(m, p) >= 2) || null : null;
+    let bestScore = Infinity;
+    if (!best) for (const m of mates) {
       const d = dist(m, p); if (d < 2) continue;
       const score = angDiff(aim, Math.atan2(m.y - p.y, m.x - p.x)) * 3 + d * 0.035;
       if (score < bestScore) { bestScore = score; best = m; }
@@ -1119,9 +1123,10 @@ const Logic = (() => {
         if (o.team === p.team || (o.role === 'POR' && !D.tech.plain) || o.stun > 0 || D.met.has(o) || dist(o, p) > (o.role === 'POR' ? 1.8 : 2.4)) continue;
         if (o.dash && o.dash.tech.type === 'bloqueo') continue;
         D.met.add(o);
+        const attackControl = p.control + draftSwing(s), defendControl = o.defense + draftSwing(s);
         const chance = D.tech.plain && o.role === 'POR' ? 0.1                                    // regate normal al portero: solo 1 de cada 10
-          : D.tech.plain ? clamp(0.58 + (p.control - o.defense) / 55, 0.3, 0.85)   // regate normal: más arriesgado
-          : clamp(0.72 + (p.control + techEff(D.tech, p.bonus.regate) * 1.2 - o.defense) / 50, 0.4, 0.95);
+          : D.tech.plain ? clamp(0.58 + (attackControl - defendControl) / 55, 0.3, 0.85)   // regate normal: más arriesgado
+          : clamp(0.72 + (attackControl + techEff(D.tech, p.bonus.regate) * 1.2 - defendControl) / 50, 0.4, 0.95);
         if (rnd() < chance || s.ball.owner !== p) {
           o.stun = D.tech.plain ? 0.55 : 0.9; o.tackle = null;
           if (D.tech.plain) { p.invuln = 0.45; if (p.team === 'A') s.events.push({ type: 'msg', text: '¡Regate!' }); }
@@ -1187,7 +1192,8 @@ const Logic = (() => {
     if (!T.hit && h && h.team !== p.team && h.role !== 'POR' && h.invuln <= 0 && dist(h, p) < 1.15) {
       T.hit = true;
       const front = Math.cos(angDiff(Math.atan2(p.y - h.y, p.x - h.x), h.aim)) > 0 ? 0.1 : -0.12;
-      const chance = clamp(0.55 + (p.defense - (h.control * 0.6 + h.body * 0.4)) / 70 + front, 0.2, 0.92);
+      const defense = p.defense + draftSwing(s), ballControl = h.control * 0.6 + h.body * 0.4 + draftSwing(s);
+      const chance = clamp(0.55 + (defense - ballControl) / 70 + front, 0.2, 0.92);
       if (rnd() < chance) {
         T.ok = true;
         h.stun = 0.8; h.kickLock = 0.5;
@@ -1384,6 +1390,34 @@ const Logic = (() => {
     return best;
   }
 
+  // En el Draft dos compañeros cercanos se ofrecen a una distancia de pase corta.
+  function supportOffer(s, owner, p) {
+    if (!s.settings.spectator || p === owner || p.team !== owner.team || p.role === 'POR' || p.stun > 0) return false;
+    const options = s.players.filter(m => m.team === owner.team && m !== owner && m.role !== 'POR' && m.stun <= 0)
+      .map(m => ({ p: m, d: dist(m, owner) })).filter(x => x.d >= 6 && x.d <= 25)
+      .sort((a, b) => a.d - b.d);
+    return options.slice(0, 2).some(x => x.p === p);
+  }
+
+  // Tras una parada, el portero busca primero un defensor con línea limpia y rival lejos.
+  function keeperOutlet(s, p) {
+    let best = null, bestScore = -Infinity;
+    const mates = s.players.filter(m => m.team === p.team && m !== p && m.role !== 'POR' && m.stun <= 0 && m.recover <= 0);
+    for (const m of mates) {
+      const d = dist(m, p); if (d < 4 || d > 22) continue;
+      let open = 99;
+      for (const o of s.players) if (o.team !== p.team) open = Math.min(open, dist(o, m));
+      const tx = m.x + m.vx * 0.15, ty = m.y + m.vy * 0.15;
+      const blocked = laneBlock(s, p, tx, ty, 1.35, true);
+      if (open < 2.8 || blocked > 0) continue;
+      const progress = depthOf(p.team, m.y) - depthOf(p.team, p.y);
+      const roleBonus = m.role === 'DEF' ? 1.8 : m.role === 'MED' ? 0.6 : 0;
+      const score = Math.min(open, 12) * 1.35 - Math.max(0, d - 9) * 0.42 + clamp(progress, -8, 12) * 0.12 + roleBonus;
+      if (score > bestScore) { bestScore = score; best = m; }
+    }
+    return best;
+  }
+
   function ai(s, p, dt) {
     const b = s.ball;
     if (p.stun > 0 || p.recover > 0 || p.tackle || p.dash || (s.tech && s.tech.p === p)) { if (!p.tackle && !p.dash) p.dvx = p.dvy = 0; return; }
@@ -1405,6 +1439,14 @@ const Logic = (() => {
       const h = homeTarget(s, p);
       let tx = h.x + Math.sin(s.t * 0.7 + p.num) * 2, ty = h.y;
       const hd = dist(p, b.owner);
+      if (s.settings.spectator && supportOffer(s, b.owner, p)) {
+        const d = hd || 1, ux = (p.x - b.owner.x) / d, uy = (p.y - b.owner.y) / d;
+        const side = (p.num || 0) % 2 === 0 ? 1 : -1;
+        tx = b.owner.x + ux * 8 - uy * side * 2.5;
+        ty = b.owner.y + uy * 8 + ux * side * 2.5;
+        tx = clamp(tx, 1.5, F.w - 1.5); ty = clamp(onside(s, p, ty), 1.5, F.l - 1.5);
+        moveTo(s, p, tx, ty, true); return;
+      }
       if (hd < 5) { tx += (p.x - b.owner.x) / (hd || 1) * 3; ty += (p.y - b.owner.y) / (hd || 1) * 3; }
       ty = onside(s, p, ty);
       moveTo(s, p, tx, ty, dist(p, { x: tx, y: ty }) > 7);
@@ -1483,7 +1525,8 @@ const Logic = (() => {
       const d = dist(m, p); if (d < 3) continue;
       let open = 9; for (const o of s.players) if (o.team !== p.team) open = Math.min(open, dist(o, m));
       const prog = depthOf(p.team, m.y) - depthOf(p.team, p.y);
-      const sc = Math.min(open, 7) + prog * 0.3 - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - (d > 18 ? 2 : 0) - (isOffside(s, m) ? 20 : 0);
+      const distancePenalty = s.settings.spectator ? Math.max(0, d - 12) * 0.38 : d > 18 ? 2 : 0;
+      const sc = Math.min(open, 7) + prog * 0.3 - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
       if (!best || sc > best.score) best = { p: m, score: sc, open };
     }
     return best;
@@ -1520,10 +1563,14 @@ const Logic = (() => {
         aimGoal(); p.windup = { t: d < 6.5 ? 0.22 : 0.38 + rnd() * 0.2, c: 0.3 + rnd() * 0.2, aimX }; return;
       }
       if (!s.tech && dribT && nd < 2.4 && rnd() < s.diff.techUse) { startTech(s, p, dribT, 0); return; }
+      if (s.settings.spectator && nd < 3.1 && (p.dribbleCd || 0) <= 0 && rnd() < 0.22) {
+        const dir = Math.atan2(goalY - p.y, cx - p.x);
+        dribble(s, p, { x: Math.cos(dir), y: Math.sin(dir) }); return;
+      }
       const m = bestPassTarget(s, p), mine = Math.min(nd, 7);
       if (m && m.score > 0 && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || rnd() < 0.04)) {
         const ahead2 = depthOf(p.team, m.p.y) > depthOf(p.team, p.y) + 3;
-        pass(s, p, ahead2 && m.open > 3 && rnd() < 0.5 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }); return;
+        pass(s, p, ahead2 && m.open > 3 && rnd() < 0.5 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }, 0, s.settings.spectator ? m.p.id : null); return;
       }
     }
     // Conducción: hacia la portería buscando el hueco más libre y lejos de la banda
@@ -1547,7 +1594,22 @@ const Logic = (() => {
     const homeY = ownGoalY(p.team) + attackDir(p.team) * 1.2;
     if (b.owner === p) {
       p.dvx = p.dvy = 0; p.holdT += dt;
-      if (p.holdT > 1.1) { const m = openMate(s, p); if (m) pass(s, p, 'strong', { x: m.x - p.x, y: m.y - p.y }); else p.holdT = 0.5; }
+      if (s.settings.spectator && p.holdT > 1.05) {
+        const m = keeperOutlet(s, p);
+        if (m && pass(s, p, 'strong', { x: m.x - p.x, y: m.y - p.y }, 0, m.id)) return;
+        if (p.holdT > 2.6) {
+          const choices = [-1, 1].map(side => {
+            const tx = clamp(cx + side * 12, 2, F.w - 2), ty = clamp(p.y + attackDir(p.team) * 22, 2, F.l - 2);
+            let open = 99; for (const o of s.players) if (o.team !== p.team) open = Math.min(open, Math.hypot(o.x - tx, o.y - ty));
+            return { side, score: open - laneBlock(s, p, tx, ty, 1.6, true) * 8 };
+          }).sort((a, b) => b.score - a.score);
+          clearance(s, p, { x: choices[0].side * 0.45, y: attackDir(p.team) });
+          return;
+        }
+      } else if (!s.settings.spectator && p.holdT > 1.1) {
+        const m = openMate(s, p);
+        if (m) pass(s, p, 'strong', { x: m.x - p.x, y: m.y - p.y }); else p.holdT = 0.5;
+      }
       return;
     }
     if (b.shot && !b.shot.resolved && b.shot.team !== p.team) {
@@ -1588,10 +1650,12 @@ const Logic = (() => {
     shot.resolved = true;
     const gt = g.gkTech && g.gkTech !== 'none' ? g.gkTech : null;
     const saveStr = g.gk + (gt ? techEff(gt, g.bonus.parada) : 0);
-    // Desde lejos el tiro pierde fuerza; sin técnica, el portero tiene ventaja
+    // Desde lejos el tiro pierde fuerza; en el Draft hay una pequeña variación de forma en cada duelo.
     const far = Math.max(0, shot.dist - 10);
-    const edge = shot.power - saveStr - 7 - (shot.tech ? 0 : shot.charged ? 3 : 9) - far * (shot.tech ? 1.8 : 2.2);
-    const chance = clamp(1 / (1 + Math.exp(edge / 14)), 0.04, 0.96);
+    const draft = !!s.settings.spectator;
+    const shotRoll = draft ? draftSwing(s) : 0, keeperRoll = draft ? draftSwing(s) : 0;
+    const edge = shot.power + shotRoll - (saveStr + keeperRoll) - 7 - (shot.tech ? 0 : shot.charged ? 3 : 9) - far * (shot.tech ? 1.8 : 2.2);
+    const chance = clamp(1 / (1 + Math.exp(edge / 14)), draft ? 0.08 : 0.04, draft ? 0.92 : 0.96);
     if (rnd() < chance) {
       if (edge < -14 && !shot.tech) { take(s, g); s.events.push({ type: 'catch', team: g.team, tech: !!gt }); return; }
       b.vy = -b.vy * 0.3; b.vx = (rnd() - 0.5) * 10; b.vz = 3; b.shot = null; b.fire = null; b.lastTeam = g.team;
@@ -1722,7 +1786,10 @@ const Logic = (() => {
     for (const d of s.players) {
       if (d.team === h.team || d.stun > 0 || d.tackle || d.dash || dist(d, h) > 0.95) continue;
       const behind = Math.cos(angDiff(Math.atan2(d.y - h.y, d.x - h.x), h.aim)) < 0;
-      let rate = (d.team === 'B' ? s.diff.steal : 1.1) * (d.defense / (h.control * 0.6 + h.body * 0.4));
+      const draft = !!s.settings.spectator;
+      const defense = draft ? clamp(d.defense + draftSwing(s), 20, 120) : d.defense;
+      const control = draft ? clamp(h.control * 0.6 + h.body * 0.4 + draftSwing(s), 20, 120) : h.control * 0.6 + h.body * 0.4;
+      let rate = (d.team === 'B' ? s.diff.steal : 1.1) * (draft ? defense / control : d.defense / (h.control * 0.6 + h.body * 0.4));
       if (behind && hs > 5) rate *= 0.3;
       if (rnd() < rate * dt) {
         h.stun = 0.45; h.kickLock = 0.4;
@@ -5196,7 +5263,12 @@ const App = (() => {
     screen('<h2>Cargando…</h2>');
     try {
       api.matchSheet = await Sprites.matchSheet([...teams.A.players, ...teams.B.players].map(p => p.sprite));
-    } catch (e) { screen(`<h2>No se pudieron cargar los jugadores</h2><p class="note">${esc(e.message)}</p><button class="cta" id="back">Volver</button>`); $('back').onclick = renderMenu; return; }
+    } catch (e) {
+      // En el iframe del Draft, propaga el error real al puente para no ocultarlo con un fallo genérico.
+      if (ROGUE_EMBED) throw e;
+      screen(`<h2>No se pudieron cargar los jugadores</h2><p class="note">${esc(e.message)}</p><button class="cta" id="back">Volver</button>`);
+      $('back').onclick = renderMenu; return;
+    }
     api.match = Logic.createMatch(s, teams);
     $('cA').src = api.mode === 'draft' && api.draftCrests ? (api.draftCrests.A || 'ui/crest1.png') : api.mode === 'wc' ? 'ui/crest3016.png' : api.mode === 'career' && Career.data ? ClubCrest.url(Career.data.crest, Career.data.school) : 'ui/crest1.png';
     $('nA').textContent = api.mode === 'draft' && api.draftNames ? (api.draftNames.A || 'Tu equipo') : api.mode === 'wc' ? 'Japón' : api.mode === 'career' && Career.data ? Career.data.school.replace(/^Instituto\s+/i, '') : 'Tú';
@@ -6268,7 +6340,6 @@ const App = (() => {
 
 
   const DRAFT_ROLE_MAP = { GK: 'POR', DF: 'DEF', MF: 'MED', FW: 'DEL', PORTERO: 'POR', DELANTERO: 'DEL', MEDIO: 'MED', DEFENSA: 'DEF' };
-  const DRAFT_GENERIC_PORTRAIT = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill="#e7b895" d="M22 8h20v5h5v20h-5v7H22v-7h-5V13h5z"/><path fill="#26354f" d="M18 13h5V8h18v5h5v9H18z"/><path fill="#376b9f" d="M12 41h40v23H12z"/><path fill="#dbe7f5" d="M22 41h20v6H22z"/><path fill="#19304c" d="M12 58h40v6H12z"/></svg>');
   const draftNorm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   function draftIdentityMatch(name, player) {
     const target = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -6331,6 +6402,8 @@ const App = (() => {
     const chosen = draftPickEleven(team);
     const roles = chosen.map(x => x.role);
     const positions = layout(roles);
+    const rogueTeam = TEAM(draftTeamKey(team, side));
+    const nativeKit = rogueTeam && rogueTeam.kit;
     const players = chosen.map(({ record, role }, i) => {
       let pd = draftPlayerFor(record, role);
       const mapped = !!(pd && pd.cs);
@@ -6338,10 +6411,13 @@ const App = (() => {
       if (!pd || !pd.cs) throw new Error('No se encontró un perfil Rogue base para ' + (record.name || role));
       const sprite = Object.assign({}, Sprites.refOf(pd));
       if (!mapped) {
-        sprite.customPortrait = record.fullImage || record.faceImage || DRAFT_GENERIC_PORTRAIT;
+        sprite.customPortrait = record.faceImage || DRAFT_GENERIC_PORTRAIT;
         sprite.customFallbacks = [record.faceImage].filter(Boolean);
+      } else {
+        sprite.customFallbacks = [record.faceImage].filter(Boolean);
+        // No sobrescribe la equipación original con los colores asignados por el Draft.
+        if (role !== 'POR' && nativeKit) sprite.kit = Object.assign({}, nativeKit);
       }
-      else if (team.kit) sprite.kit = Object.assign({}, team.kit);
       const rating = Number(record.rating) || Number(record.med) || 70;
       const stat = key => {
         const base = Number(pd.ie && pd.ie[key]);

@@ -1,6 +1,6 @@
 # Motor Inazuma Rogue integrado en Inazuma Draft
 
-- Código fuente local: `datos/rogue_index.html` (SHA-256 `69a1b0f0d79876b55b1f9b0e355ca54fe62c41bbc5c5d305e93d705b05fbafd7`).
+- Código fuente local: `datos/rogue_index.html` (SHA-256 `6f8a3a119ba7d5d98bd42d7b2a2a6ccbc70de9204309dcbe72b9c9b7f03b0717`).
 - Repositorio de assets: https://github.com/Emiilsito/InazumaRoguelite
 - Commit de assets: `2a37d23eaecb7b5ace62144765be95287f655026`.
 - El motor, la lógica de partido, Phaser y las hojas/animaciones Rogue se mantienen originales.

@@ -512,21 +512,12 @@ async function iniciarRogueMatch(homeId,awayId){
   }
   var preparing=document.createElement('div');preparing.id='draftRoguePreparing';preparing.style.cssText='position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:24px;background:#061008;color:#ffe066;font:700 18px/1.4 system-ui,sans-serif;text-align:center';preparing.textContent='Preparando el once y las apariencias…';document.body.appendChild(preparing);
   async function packTeam(index){
-    var team=M.equipos[index]||{},once=team.once||[],original=EQUIPOS[team.id]||team;
-    var kit={a:String(original.aro2||original.aro||'#d5b410'),b:String(original.placa||original.aro||'#39527b')};
+    var team=M.equipos[index]||{},once=team.once||[];
     var players=once.map(function(p,i){
       var face=String(p.cara||p.c||p.face||''),role=String(p.pos||p.role||'MED');
-      return {name:String(p.n||p.nombre||p.corto||('Jugador '+(i+1))),face:face,faceImage:CARAS[face]||'',fullImage:'',role:role,rating:Number(p.med)||0};
+      return {name:String(p.n||p.nombre||p.corto||('Jugador '+(i+1))),face:face,faceImage:CARAS[face]||'',role:role,rating:Number(p.med)||0};
     });
-    await Promise.all(players.map(async function(p){
-      try{
-        if(window.DibujosReales&&window.DibujosReales.has&&window.DibujosReales.has(p.face)&&window.ActivosDibujosReales&&window.ActivosDibujosReales.palettes&&window.ActivosDibujosReales.palettes[team.id]){
-          var role=String(p.role||'').toUpperCase(),kind=role==='POR'||role==='GK'||role==='PORTERO'?'portero':'campo';
-          p.fullImage=await window.DibujosReales.compose(p.face,String(team.id),kind,'frente',false);
-        }
-      }catch(_){}
-    }));
-    return {id:String(team.id||''),name:String(team.nombre||team.corto||'Equipo Draft'),crest:EMBLEMS[team.emblema]||'',kit:kit,players:players};
+    return {id:String(team.id||''),name:String(team.nombre||team.corto||'Equipo Draft'),crest:EMBLEMS[team.emblema]||'',players:players};
   }
   var packed=await Promise.all([packTeam(mySide),packTeam(1-mySide)]);
   var myTeam=packed[0],rivalTeam=packed[1];
@@ -556,7 +547,7 @@ async function iniciarRogueMatch(homeId,awayId){
   window.__draftRogueBridge=state;
   window.addEventListener('message',state.onMessage);
   state.timer=setTimeout(function(){if(!state.started)fallarRogueMatch('no se recibió la señal de inicio')},45000);
-  frame.src='rogue/index.html?embed=1';
+  frame.src='rogue/index.html?embed=1&v=2';
 }
 
 function launchMatch(){if(window.MUNECO_ESPERA&&!window.MUNECO_ESPERA()){window.MUNECO_ENCOLAR(launchMatch);return}var p=$3("matchPick");if(p)p.classList.remove("is-open");var f=$3("matchEnd");if(f)f.classList.remove("is-open");var v=$3("viewMatch");if(v){v.classList.add("is-open");v.setAttribute("aria-hidden","false")}etiquetasResultado();document.body.classList.add("in-match");iniciarRogueMatch(Pick.home,Pick.away);clearInterval(vigia);vigia=setInterval(function(){if(M.fase==="fin"){clearInterval(vigia);vigia=0;try{if(window.Carrera)window.Carrera.guardarFinal149()}catch(e){}var sc=$3("mendScore"),rs=$3("mendRes"),fe=$3("matchEnd");if(typeof Sfx!=="undefined"&&Sfx.musica)Sfx.musica(false);if(typeof Sfx!=="undefined"&&Sfx.final)Sfx.final();if(typeof Sfx!=="undefined"&&Sfx.victoria)Sfx.victoria(true);var onp=document.getElementById("lvOnPitch");if(onp)onp.innerHTML="";lvTecKey=null;var emA=document.getElementById("mendEmA"),emB=document.getElementById("mendEmB");if(emA)emA.src=emblemaEq(0);if(emB)emB.src=emblemaEq(1);var nA=document.getElementById("mendNameA"),nB=document.getElementById("mendNameB");if(nA)nA.textContent=M.equipos[0].nombre;if(nB)nB.textContent=M.equipos[1].nombre;var trA=document.getElementById("mendTeamA"),trB=document.getElementById("mendTeamB");if(trA)trA.className="mend-team a";if(trB)trB.className="mend-team b";if(sc)sc.textContent=M.marcador[0]+" - "+M.marcador[1];if(rs){var a=M.equipos[0].nombre,b=M.equipos[1].nombre;rs.textContent=M.marcador[0]===M.marcador[1]?"Empate":M.marcador[0]>M.marcador[1]?"Gana "+a:"Gana "+b}pintarEstadisticas();etiquetasResultado();if(fe)fe.classList.add("is-open")}},400)}
