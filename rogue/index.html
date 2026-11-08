@@ -553,12 +553,36 @@ const Sprites = (() => {
   }
   // Monta una hoja con una fila por jugador del partido
   async function matchSheet(refs) {
-    const imgs = await Promise.all(refs.map(r => img(r.file)));
-    const w = imgs[0].width;
+    const loadPortrait = src => new Promise(resolve => {
+      const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null); image.src = src;
+    });
+    const loaded = await Promise.all(refs.map(async r => {
+      if (r.customPortrait) {
+        const sources = [r.customPortrait].concat(r.customFallbacks || [], [DRAFT_GENERIC_PORTRAIT]).filter((src, i, all) => src && all.indexOf(src) === i);
+        for (const src of sources) { const portrait = await loadPortrait(src); if (portrait) return { image: portrait, portrait: true }; }
+        const generic = await loadPortrait(DRAFT_GENERIC_PORTRAIT);
+        if (generic) return { image: generic, portrait: true };
+        const blank = document.createElement('canvas'); blank.width = blank.height = 48;
+        return { image: blank, portrait: true };
+      }
+      return { image: await img(r.file), portrait: false };
+    }));
+    const w = 48 * GAME.frames.length;
     const c = document.createElement('canvas');
     c.width = w; c.height = refs.length * 48;
     const g = c.getContext('2d');
-    refs.forEach((r, k) => { g.drawImage(imgs[k], 0, r.row * 48, w, 48, 0, k * 48, w, 48); if (r.kit) recolor(g, w, k * 48, r.kit); });
+    refs.forEach((r, k) => {
+      const item = loaded[k];
+      if (item.portrait) {
+        const scale = Math.min(48 / item.image.width, 48 / item.image.height), dw = item.image.width * scale, dh = item.image.height * scale;
+        const oldSmoothing = g.imageSmoothingEnabled; g.imageSmoothingEnabled = false;
+        for (let x = 0; x < w; x += 48) g.drawImage(item.image, 0, 0, item.image.width, item.image.height, x + (48 - dw) / 2, k * 48 + (48 - dh) / 2, dw, dh);
+        g.imageSmoothingEnabled = oldSmoothing;
+      } else {
+        g.drawImage(item.image, 0, r.row * 48, w, 48, 0, k * 48, w, 48);
+        if (r.kit) recolor(g, w, k * 48, r.kit);
+      }
+    });
     return c;
   }
   // Equipación propia: cambia los colores de la camiseta del Raimon (amarillo) y de mangas/pantalón (azul)
@@ -800,9 +824,12 @@ let GAME_SPEED = 0.75;   // todo el juego un 25 % más pausado (el reloj del par
 
 const Logic = (() => {
   // Campo para 5 contra 5 (provisional)
-  const F = { w: 34, l: 52, margin: 4, goalW: 5.5, goalDepth: 1.5, barZ: 2.0,
-              boxW: 18, boxD: 7.5, smallW: 9, smallD: 2.5, spot: 6.5, circleR: 5.5 };
-  const cx = F.w / 2;
+  const F5 = { w: 34, l: 52, margin: 4, goalW: 5.5, goalDepth: 1.5, barZ: 2.0,
+               boxW: 18, boxD: 7.5, smallW: 9, smallD: 2.5, spot: 6.5, circleR: 5.5 };
+  const F11 = { w: 68, l: 105, margin: 5, goalW: 7.32, goalDepth: 2.44, barZ: 2.44,
+                boxW: 40.32, boxD: 16.5, smallW: 18.32, smallD: 5.5, spot: 11, circleR: 9.15 };
+  const F = Object.assign({}, F5);
+  let cx = F.w / 2;
   const rnd = Math.random;
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -831,6 +858,8 @@ const Logic = (() => {
 
   /* ---------- Creación ---------- */
   function createMatch(settings, teams) {
+    const isEleven = teams && ((teams.A && teams.A.players && teams.A.players.length >= 11) || (teams.B && teams.B.players && teams.B.players.length >= 11));
+    Object.assign(F, isEleven ? F11 : F5); cx = F.w / 2;
     const diff = DIFF[settings.difficulty] || DIFF.medio;
     const s = { field: F, settings, diff, teams, players: [], score: { A: 0, B: 0 }, time: settings.minutes * 60, t: 0,
       pause: null, hitstop: 0, over: false, result: null, golden: false, controlledId: null, events: [], slow: 0, tech: null, effects: [],
@@ -839,7 +868,7 @@ const Logic = (() => {
     for (const team of ['A', 'B']) {
       teams[team].players.forEach((d, i) => {
         const ai = team === 'B';
-        const home = d.home || BASE[d.role], ko = d.ko || [home[0], Math.min(home[1], 22)];
+        const home = d.home || BASE[d.role] || [0, F.l / 2], ko = d.ko || [home[0], Math.min(home[1], F.l / 2 - 1)];
         s.players.push(Object.assign({}, d, { id: team + i, team, num: i + 1, home, ko,
           speed: d.speed * (ai ? diff.aiSpeed : 1),
           cd: {}, x: 0, y: 0, z: 0, vx: 0, vy: 0, dvx: 0, dvy: 0, facing: 0, aim: 0, moving: false,
@@ -1795,17 +1824,25 @@ const FORMATIONS = {
   '1-2-2-0': { name: 'Muralla',      roles: ['POR', 'DEF', 'DEF', 'MED', 'MED'] },
   '1-3-0-1': { name: 'Cerrojo',      roles: ['POR', 'DEF', 'DEF', 'DEF', 'DEL'] },
 };
-const SPREAD = { 1: [0], 2: [-7, 7], 3: [-10, 0, 10] };
-const DEPTH = { POR: 1.2, DEF: 11, MED: 21, DEL: 31 };
-const KODEPTH = { POR: 1.2, DEF: 9, MED: 16, DEL: 22 };
-// Posición base (x, distancia a tu portería) de cada puesto según cuántos hay de cada tipo
+const SPREAD5 = { 1: [0], 2: [-7, 7], 3: [-10, 0, 10] };
+const DEPTH5 = { POR: 1.2, DEF: 11, MED: 21, DEL: 31 };
+const KODEPTH5 = { POR: 1.2, DEF: 9, MED: 16, DEL: 22 };
+const DEPTH11 = { POR: 3, DEF: 27, MED: 52, DEL: 78 };
+const KODEPTH11 = { POR: 3, DEF: 22, MED: 40, DEL: 51 };
+// Mantiene el Rogue original 5v5 y abre el campo completo para los onces del Draft.
 function layout(roles) {
-  const cnt = {}, idx = {};
+  const eleven = roles.length >= 11, cnt = {}, idx = {};
   roles.forEach(r => { cnt[r] = (cnt[r] || 0) + 1; });
   return roles.map(r => {
     const i = idx[r] = (idx[r] || 0); idx[r]++;
-    const x = r === 'POR' ? 0 : (SPREAD[cnt[r]] || [0])[i] + (cnt[r] === 1 ? (r === 'MED' ? 3 : r === 'DEL' ? -2 : 0) : 0);
-    return { role: r, home: [x, DEPTH[r]], ko: [x * 0.8, KODEPTH[r]] };
+    if (!eleven) {
+      const x = r === 'POR' ? 0 : (SPREAD5[cnt[r]] || [0])[i] + (cnt[r] === 1 ? (r === 'MED' ? 3 : r === 'DEL' ? -2 : 0) : 0);
+      return { role: r, home: [x, DEPTH5[r] || 21], ko: [x * 0.8, KODEPTH5[r] || 16] };
+    }
+    const n = cnt[r], gap = n <= 1 ? 0 : Math.min(20, 58 / (n - 1));
+    const lineX = (i - (n - 1) / 2) * gap;
+    const x = r === 'POR' && n === 1 ? 0 : lineX + (n === 1 ? (r === 'MED' ? 3 : r === 'DEL' ? -2 : 0) : 0);
+    return { role: r, home: [x, DEPTH11[r] || 52], ko: [x * 0.85, KODEPTH11[r] || 40] };
   });
 }
 
@@ -6205,10 +6242,22 @@ const App = (() => {
   };
 
 
-  const DRAFT_ROGUE_ROLES = ['POR', 'DEF', 'MED', 'DEL', 'DEL'];
   const DRAFT_ROLE_MAP = { GK: 'POR', DF: 'DEF', MF: 'MED', FW: 'DEL', PORTERO: 'POR', DELANTERO: 'DEL', MEDIO: 'MED', DEFENSA: 'DEF' };
+  const DRAFT_GENERIC_PORTRAIT = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill="#e7b895" d="M22 8h20v5h5v20h-5v7H22v-7h-5V13h5z"/><path fill="#26354f" d="M18 13h5V8h18v5h5v9H18z"/><path fill="#376b9f" d="M12 41h40v23H12z"/><path fill="#dbe7f5" d="M22 41h20v6H22z"/><path fill="#19304c" d="M12 58h40v6H12z"/></svg>');
   const draftNorm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  function draftRole(value) { const v = String(value || '').toUpperCase(); return DRAFT_ROLE_MAP[v] || (DRAFT_ROGUE_ROLES.includes(v) ? v : 'MED'); }
+  function draftIdentityMatch(name, player) {
+    const target = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const targetNorm = draftNorm(name), targetWords = target.split(/[^a-z0-9]+/).filter(x => x.length >= 4);
+    if (!targetNorm) return false;
+    return [player.full, player.name, player.nick].some(value => {
+      const label = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const norm = draftNorm(value);
+      if (!norm) return false;
+      if (norm === targetNorm || (norm.length >= 5 && targetNorm.length >= 5 && (norm.includes(targetNorm) || targetNorm.includes(norm)))) return true;
+      return label.split(/[^a-z0-9]+/).some(word => word.length >= 4 && targetWords.includes(word));
+    });
+  }
+  function draftRole(value) { const v = String(value || '').toUpperCase(); return DRAFT_ROLE_MAP[v] || (['POR', 'DEF', 'MED', 'DEL'].includes(v) ? v : 'MED'); }
   function draftTeamKey(team, side) {
     const aliases = window.RogueDraftTeamMap || {};
     const direct = aliases[String(team.id || '').toLowerCase()];
@@ -6226,56 +6275,58 @@ const App = (() => {
     const map = window.RogueDraftMap || {};
     const entry = map[String(record.face || '')];
     const id = typeof entry === 'number' ? entry : entry && entry.id;
-    if (id != null && PLAYER(id)) return PLAYER(id);
+    const mapped = id != null ? PLAYER(id) : null;
+    if (mapped && draftIdentityMatch(record.name, mapped)) return mapped;
     const wanted = draftNorm(record.name);
     if (!wanted) return null;
     const matches = GAME.players.filter(p => p.cs && (draftNorm(p.full) === wanted || draftNorm(p.name) === wanted || draftNorm(p.nick) === wanted));
-    return matches.find(p => p.role === role) || matches[0] || null;
+    const sameRole = matches.filter(p => p.role === role);
+    return sameRole.length === 1 ? sameRole[0] : matches.length === 1 ? matches[0] : null;
   }
-  function draftPickFive(team) {
+  function draftPickEleven(team) {
     const roster = Array.isArray(team.players) ? team.players.map((p, i) => Object.assign({}, p, { __i: i, __role: draftRole(p.role) })) : [];
+    if (roster.length < 11) throw new Error('El equipo ' + (team.name || '') + ' necesita un once completo de 11 jugadores.');
+    if (roster.length === 11) return roster.map(p => ({ record: p, role: p.__role }));
+    const slots = ['POR', 'DEF', 'DEF', 'DEF', 'DEF', 'MED', 'MED', 'MED', 'DEL', 'DEL', 'DEL'];
     const used = new Set(), out = [];
-    for (const role of DRAFT_ROGUE_ROLES) {
-      let options = roster.filter(p => !used.has(p.__i) && p.__role === role);
-      if (!options.length) options = roster.filter(p => !used.has(p.__i));
+    for (const slot of slots) {
+      let options = roster.filter(p => !used.has(p.__i) && p.__role === slot);
       options.sort((a, b) => (+b.rating || +b.med || 0) - (+a.rating || +a.med || 0));
-      const chosen = options[0];
-      if (chosen) { used.add(chosen.__i); out.push({ record: chosen, role }); }
+      let chosen = options[0];
+      if (!chosen) chosen = roster.filter(p => !used.has(p.__i)).sort((a, b) => (+b.rating || +b.med || 0) - (+a.rating || +a.med || 0))[0];
+      if (chosen) { used.add(chosen.__i); out.push({ record: chosen, role: chosen.__role }); }
     }
-    while (out.length < 5) {
-      const options = roster.filter(p => !used.has(p.__i)).sort((a, b) => (+b.rating || +b.med || 0) - (+a.rating || +a.med || 0));
-      const chosen = options[0];
-      if (!chosen) break;
-      used.add(chosen.__i); out.push({ record: chosen, role: chosen.__role });
-    }
-    if (out.length !== 5) throw new Error('El equipo ' + (team.name || '') + ' no tiene cinco jugadores.');
+    if (out.length !== 11) throw new Error('No se pudo completar el once de ' + (team.name || '') + '.');
     return out;
   }
+  function draftTemplatePlayer(role) {
+    return GAME.players.find(p => p.cs && p.role === role) || GAME.players.find(p => p.cs) || null;
+  }
   function buildDraftRogueTeam(team, side) {
-    const chosen = draftPickFive(team);
+    const chosen = draftPickEleven(team);
     const roles = chosen.map(x => x.role);
     const positions = layout(roles);
-    const reserveKey = draftTeamKey(team, side);
-    const reserve = rivalTeam(reserveKey, 1, 0.65).players.slice();
-    const usedSource = new Set();
     const players = chosen.map(({ record, role }, i) => {
       let pd = draftPlayerFor(record, role);
-      let sprite = pd && pd.cs ? Sprites.refOf(pd) : null;
-      if (!pd || !sprite) {
-        let fb = reserve.find(p => p.role === role && !usedSource.has(p.key));
-        if (!fb) fb = reserve.find(p => !usedSource.has(p.key));
-        if (!fb) fb = reserve[i % reserve.length];
-        if (!fb || !PLAYER(fb.key)) throw new Error('No se encontró un sprite Rogue de reserva para ' + (record.name || role));
-        usedSource.add(fb.key);
-        pd = PLAYER(fb.key);
-        sprite = Object.assign({}, fb.sprite);
-      } else usedSource.add(pd.id);
-      const stat = key => Math.round(Number(pd.ie && pd.ie[key]) || 70);
-      const techs = startingTechs(pd);
-      const matchPlayer = buildMatchPlayer(pd.id, role, stat, techs, [], side * 5 + i, positions[i]);
+      const mapped = !!(pd && pd.cs);
+      if (!mapped) pd = draftTemplatePlayer(role);
+      if (!pd || !pd.cs) throw new Error('No se encontró un perfil Rogue base para ' + (record.name || role));
+      const sprite = Object.assign({}, Sprites.refOf(pd));
+      if (!mapped) {
+        sprite.customPortrait = record.fullImage || record.faceImage || DRAFT_GENERIC_PORTRAIT;
+        sprite.customFallbacks = [record.faceImage].filter(Boolean);
+      }
+      else if (team.kit) sprite.kit = Object.assign({}, team.kit);
+      const rating = Number(record.rating) || Number(record.med) || 70;
+      const stat = key => {
+        const base = Number(pd.ie && pd.ie[key]);
+        return Math.round(mapped ? (base || rating) : (base ? base * 0.6 + rating * 0.4 : rating));
+      };
+      const techs = mapped ? startingTechs(pd) : [];
+      const matchPlayer = buildMatchPlayer(pd.id, role, stat, techs, [], side * 11 + i, positions[i]);
       matchPlayer.key = String(record.face || record.name || ('draft-' + side + '-' + i));
       matchPlayer.name = String(record.name || pd.name || 'Jugador');
-      matchPlayer.sprite = Object.assign({}, sprite);
+      matchPlayer.sprite = sprite;
       return matchPlayer;
     });
     return { name: String(team.name || 'Equipo Draft'), key: String(team.id || team.name || ''), players };
