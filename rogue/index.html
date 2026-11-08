@@ -3,6 +3,13 @@ body.rogue-embedded{position:fixed;inset:0;width:100%;height:100%;height:100dvh;
 body.rogue-embedded #shell{position:fixed;inset:0;width:100%;height:100%;height:100dvh;max-width:none}
 body.rogue-embedded #app{position:absolute;inset:0;width:100%;height:100%;}
 body.rogue-embedded #intro{display:none!important}
+body.rogue-embedded.rogue-spectator #touch,
+body.rogue-embedded.rogue-spectator #stick,
+body.rogue-embedded.rogue-spectator #pad,
+body.rogue-embedded.rogue-spectator #keyhud,
+body.rogue-embedded.rogue-spectator #pauseBtn,
+body.rogue-embedded.rogue-spectator #pause,
+body.rogue-embedded.rogue-spectator #dbg{display:none!important;pointer-events:none!important}
 </style>
 </head><body>
 <!doctype html>
@@ -912,8 +919,8 @@ const Logic = (() => {
     Object.assign(b, { owner: p, intended: null, shot: null, fire: null, offside: null, setPiece: null, lastTeam: p.team, vx: 0, vy: 0, vz: 0, z: 0 });
     b.ang = p.aim;
     p.holdT = 0; p.think = 0.2 + rnd() * 0.25;
-    if (p.team === 'A') s.controlledId = p.id;   // también el portero, mientras tenga el balón
-    if (p.role === 'POR' && p.team === 'A') { s.gkHold = 0; if (!s.gkHint) { s.gkHint = true; s.events.push({ type: 'msg', text: 'Tu portero tiene el balón: pasa (J) o despeja (L)' }); } }
+    if (p.team === 'A' && !s.settings.spectator) s.controlledId = p.id;   // también el portero, mientras tenga el balón
+    if (p.role === 'POR' && p.team === 'A' && !s.settings.spectator) { s.gkHold = 0; if (!s.gkHint) { s.gkHint = true; s.events.push({ type: 'msg', text: 'Tu portero tiene el balón: pasa (J) o despeja (L)' }); } }
     syncBall(s, 1);
   }
 
@@ -937,7 +944,7 @@ const Logic = (() => {
     let v = p.speed;
     if (s.ball.owner === p) v *= 0.93;
     if (sprint && !p.tired && p.stamina > 0.02) { v *= 1.38; p.sprint = true; }
-    if (p.id === s.controlledId && s.shoot.charging) v *= 0.45;
+    if (p.id === s.controlledId && !s.settings.spectator && s.shoot.charging) v *= 0.45;
     return v;
   }
 
@@ -977,7 +984,7 @@ const Logic = (() => {
     s.ball.intended = best.id;
     s.ball.passPower = power;
     if (off) s.ball.offside = best.id;
-    if (p.team === 'A') s.controlledId = best.id;
+    if (p.team === 'A' && !s.settings.spectator) s.controlledId = best.id;
     s.events.push({ type: 'pass', power });
     return true;
   }
@@ -1193,7 +1200,7 @@ const Logic = (() => {
     }
     if (T.t <= 0) {
       p.tackle = null; p.recover = T.ok ? 0.1 : 0.4;
-      if (!T.ok && p.team === 'A' && p.id === s.controlledId) s.events.push({ type: 'msg', text: 'Entrada fallida' });
+      if (!T.ok && p.team === 'A' && p.id === s.controlledId && !s.settings.spectator) s.events.push({ type: 'msg', text: 'Entrada fallida' });
     }
   }
 
@@ -1408,7 +1415,7 @@ const Logic = (() => {
 
   function defendAI(s, p, dt) {
     const h = s.ball.owner, gy = ownGoalY(p.team);
-    const pressers = s.players.filter(q => q.team === p.team && q.role !== 'POR' && q.stun <= 0 && q.id !== s.controlledId)
+    const pressers = s.players.filter(q => q.team === p.team && q.role !== 'POR' && q.stun <= 0 && (s.settings.spectator || q.id !== s.controlledId))
       .sort((a, q) => dist(a, h) - dist(q, h));
     if (h.role === 'POR') {   // portero con el balón: no se le puede robar, así que se cubren los pases
       const o = (s.marks && s.marks[p.id]) || null;
@@ -1448,7 +1455,7 @@ const Logic = (() => {
     const h = s.ball.owner; s.marks = {};
     if (!h) return;
     const def = h.team === 'A' ? 'B' : 'A';
-    const ds = s.players.filter(p => p.team === def && p.role !== 'POR' && p.id !== s.controlledId);
+    const ds = s.players.filter(p => p.team === def && p.role !== 'POR' && (s.settings.spectator || p.id !== s.controlledId));
     const os = s.players.filter(q => q.team === h.team && q.role !== 'POR' && q !== h);
     const used = new Set();
     for (const d of ds.sort((a, b) => depthOf(def, a.y) - depthOf(def, b.y))) {
@@ -1683,7 +1690,7 @@ const Logic = (() => {
 
     // Imán suave: el balón suelto y lento se acerca a tu jugador si está cerca
     const me = controlled(s);
-    if (me && sp < 7 && b.z < 0.5 && me.stun <= 0 && me.kickLock <= 0) {
+    if (!s.settings.spectator && me && sp < 7 && b.z < 0.5 && me.stun <= 0 && me.kickLock <= 0) {
       const d = dist(me, b);
       if (d < 2.6 && d > 0.3) { b.vx += (me.x - b.x) / d * 12 * dt; b.vy += (me.y - b.y) / d * 12 * dt; }
     }
@@ -1693,7 +1700,8 @@ const Logic = (() => {
       if (p.stun > 0 || p.kickLock > 0) continue;
       const isGK = p.role === 'POR' && inOwnBox(p.team, b);
       if (isGK && b.shot && !b.shot.resolved && b.shot.team !== p.team) continue;
-      const r = isGK ? 1.0 : p.id === s.controlledId ? 1.25 : 0.75, maxZ = isGK ? 2.3 : p.id === s.controlledId ? 1.2 : 1.0;
+      const userPlayer = p.id === s.controlledId && !s.settings.spectator;
+      const r = isGK ? 1.0 : userPlayer ? 1.25 : 0.75, maxZ = isGK ? 2.3 : userPlayer ? 1.2 : 1.0;
       if (b.z > maxZ) continue;
       if (!isGK && sp > 16 && b.intended !== p.id) continue;
       const d = dist(p, b);
@@ -1768,7 +1776,7 @@ const Logic = (() => {
       else if (p.tackle) updateTackle(s, p, dt);
       else if (p.stun > 0 || p.recover > 0) { p.dvx = p.dvy = 0; }
       // Aceleración alta = frenadas y giros secos, sin deslizar
-      const accRate = p.diving ? 60 : (p.tackle || p.dash) ? 90 : p.id === s.controlledId ? 55 : 38;
+      const accRate = p.diving ? 60 : (p.tackle || p.dash) ? 90 : (p.id === s.controlledId && !s.settings.spectator) ? 55 : 38;
       const acc = accRate * dt;
       let ax = p.dvx - p.vx, ay = p.dvy - p.vy; const al = Math.hypot(ax, ay);
       if (al > acc) { ax *= acc / al; ay *= acc / al; }
@@ -1779,7 +1787,7 @@ const Logic = (() => {
       if (p.role === 'POR' && s.ball.owner === p) keepInBox(p);
       const spd = Math.hypot(p.vx, p.vy);
       p.moving = spd > 0.6;
-      if (p.id !== s.controlledId && spd > 0.8 && !p.tackle && !p.dash && s.ball.owner !== p) { p.aim = Math.atan2(p.vy, p.vx); p.facing = snap8(p.aim); }
+      if ((p.id !== s.controlledId || s.settings.spectator) && spd > 0.8 && !p.tackle && !p.dash && s.ball.owner !== p) { p.aim = Math.atan2(p.vy, p.vx); p.facing = snap8(p.aim); }
       if (p.sprint && p.moving) { p.stamina -= 0.24 * p.stamDrain * dt; if (p.stamina <= 0) { p.stamina = 0; p.tired = true; } }
       else p.stamina = Math.min(1, p.stamina + 0.1 * (p.bonus.recobro || 1) * dt);
       if (p.tired && p.stamina > 0.3) p.tired = false;
@@ -3535,6 +3543,15 @@ function paintControl(v, on) {
   v.ring.setVisible(on); v.marker.setVisible(on); v.tag.setVisible(on);
 }
 
+function spectatorCameraTarget(ball) {
+  const carrier = ball.owner && typeof ball.owner === 'object' ? ball.owner : null;
+  const vx = Number(carrier ? carrier.vx : ball.vx) || 0;
+  const vy = Number(carrier ? carrier.vy : ball.vy) || 0;
+  const clampLead = (value, min, max) => Math.max(min, Math.min(max, value));
+  return { x: (ball.x + clampLead(vx * 0.45, -6, 6)) * PX,
+           y: (ball.y + clampLead(vy * 0.45, -9, 9)) * PX };
+}
+
 class MatchScene extends Phaser.Scene {
   constructor() { super('match'); }
   create() {
@@ -3614,7 +3631,8 @@ class MatchScene extends Phaser.Scene {
     this.camInit = false;
     for (const t of Object.values(this.trails)) t.stop();
     this.tfx.reset();
-    this.cameras.main.setZoom(1);
+    this.cameras.main.setFollowOffset(0, s.settings.spectator ? 0 : 60);
+    this.cameras.main.setZoom(s.settings.spectator ? 0.82 : 1);
   }
 
   fxRing(x, y, color, scale, depth, width = 4) {
@@ -3634,7 +3652,8 @@ class MatchScene extends Phaser.Scene {
       const v = this.views.get(p.id);
       v.root.setPosition(p.x * PX, p.y * PX).setDepth(p.y * PX);
       v.arrow.rotation = p.aim;
-      paintControl(v, p.id === s.controlledId);
+      v.arrow.setVisible(!s.settings.spectator);
+      paintControl(v, !s.settings.spectator && p.id === s.controlledId);
       const [di, flip] = dirOf(p.facing);
       let f = ANIM.stand[di];
       const techP = s.tech && s.tech.p === p;
@@ -3691,9 +3710,11 @@ class MatchScene extends Phaser.Scene {
     }
 
     this.tfx.update(s, time, delta);
-    const me = Logic.controlled(s), foc = this.tfx.focus(s, me), bl = s.ball;
+    const spectator = !!s.settings.spectator, me = Logic.controlled(s), bl = s.ball;
+    const foc = spectator ? { x: bl.x * PX, y: bl.y * PX, z: 1 } : this.tfx.focus(s, me);
     let tx = foc.x, ty = foc.y;
-    if (foc.z === 1) {
+    if (spectator) { const target = spectatorCameraTarget(bl); tx = target.x; ty = target.y; }
+    else if (foc.z === 1) {
       // Juego normal: la cámara mira a tu jugador pero se inclina hacia el balón; con el balón en el aire
       // (un pase) lo acompaña a él, así al cambiar de jugador no pega un salto
       const w = bl.owner ? (bl.owner === me ? 0 : 0.35) : 0.65;
@@ -3703,7 +3724,7 @@ class MatchScene extends Phaser.Scene {
     }
     if (!this.camInit) { this.camT.x = tx; this.camT.y = ty; this.camV = { x: 0, y: 0 }; this.camInit = true; }
     // Muelle amortiguado: acelera y frena suave, sin tirones (con tope de velocidad)
-    const dt = Math.min(0.05, delta / 1000), W = foc.z === 1 ? 4.2 : 6.5, V = this.camV;
+    const dt = Math.min(0.05, delta / 1000), W = spectator ? 5.4 : foc.z === 1 ? 4.2 : 6.5, V = this.camV;
     V.x += ((tx - this.camT.x) * W * W - V.x * 2 * W) * dt; V.y += ((ty - this.camT.y) * W * W - V.y * 2 * W) * dt;
     const vl = Math.hypot(V.x, V.y), VMAX = 1100;
     if (vl > VMAX) { V.x *= VMAX / vl; V.y *= VMAX / vl; }
@@ -3723,11 +3744,11 @@ class MatchScene extends Phaser.Scene {
     }
     this.shield.length = 0;
     const x = me.x * PX, y = me.y * PX;
-    if (me.stamina < 0.99) {
+    if (!s.settings.spectator && me.stamina < 0.99) {
       g.fillStyle(0x000000, 0.5).fillRect(x - 15, y + 26, 30, 4);
       g.fillStyle(me.tired ? 0xe04a3a : 0x7ee36a).fillRect(x - 15, y + 26, 30 * me.stamina, 4);
     }
-    if (s.pass && s.pass.charge > 0.12) {   // fuerza del pase
+    if (!s.settings.spectator && s.pass && s.pass.charge > 0.12) {   // fuerza del pase
       const c = s.pass.charge;
       g.fillStyle(0x000000, 0.55).fillRect(x - 18, y - 74, 36, 6);
       g.fillStyle(c > 0.85 ? 0xffffff : 0x6fe3ff).fillRect(x - 18, y - 74, 36 * c, 6);
@@ -3737,7 +3758,7 @@ class MatchScene extends Phaser.Scene {
       g.fillStyle(0x000000, 0.55).fillRect(qx - 18, qy - 74, 36, 6);
       g.fillStyle(c > 0.85 ? 0xff7a1a : 0xffd23a).fillRect(qx - 18, qy - 74, 36 * c, 6);
     }
-    if (s.shoot.charging) {
+    if (!s.settings.spectator && s.shoot.charging) {
       const c = s.shoot.charge;
       g.fillStyle(0x000000, 0.55).fillRect(x - 18, y - 74, 36, 6);
       g.fillStyle(c > 0.85 ? 0xff7a1a : 0xffd23a).fillRect(x - 18, y - 74, 36 * c, 6);
@@ -5168,7 +5189,8 @@ const App = (() => {
   /* ---------- Partidos ---------- */
   async function startMatch(teams, golden, field, musicRole, rival) {
     GAME_SPEED = settings.dev && settings.speed ? +settings.speed : 0.75;
-    const s = Object.assign({}, settings, { golden, field, difficulty: api.mode === 'draft' ? (api.draftDifficulty || 'medio') : api.mode === 'run' ? api.run.diff : api.mode === 'career' || api.mode === 'wc' ? Career.matchDiff() : 'facil' });
+    const spectator = !!api.spectator;
+    const s = Object.assign({}, settings, { golden, field, spectator, allAI: spectator || !!settings.allAI, difficulty: api.mode === 'draft' ? (api.draftDifficulty || 'medio') : api.mode === 'run' ? api.run.diff : api.mode === 'career' || api.mode === 'wc' ? Career.matchDiff() : 'facil' });
     screen('<h2>Cargando…</h2>');
     try {
       api.matchSheet = await Sprites.matchSheet([...teams.A.players, ...teams.B.players].map(p => p.sprite));
@@ -5196,6 +5218,7 @@ const App = (() => {
     startMatch({ A, B: rivalTeam(key, 0.9, 0.5) }, false, TEAM_FIELD[key], 'match', key);
   }
   api.togglePause = () => {
+    if (api.spectator) return;
     if (!api.match || api.match.over || !$('screen').hidden) return;
     if (api.running) {
       api.running = false;
@@ -6334,6 +6357,8 @@ const App = (() => {
   api.startDraftMatch = async payload => {
     if (!ROGUE_EMBED || !payload || !payload.teams || !payload.teams.A || !payload.teams.B) return false;
     api.mode = 'draft';
+    api.spectator = true;
+    document.body.classList.add('rogue-spectator');
     api.draftNames = { A: payload.teams.A.name, B: payload.teams.B.name };
     api.draftCrests = { A: payload.teams.A.crest || '', B: payload.teams.B.crest || '' };
     api.draftDifficulty = payload.difficulty || 'medio';

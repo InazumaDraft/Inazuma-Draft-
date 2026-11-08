@@ -55,10 +55,6 @@ function _createForOfIteratorHelper(r,e){var t="undefined"!=typeof Symbol&&r[Sym
 </style><style id="ESTILO_IE_2"></style><style id="SIN_AROS_FX_V2"></style><style id="DUELO_FRENTE_FRENTE_V1"></style><style id="draft-rogue-bridge-style">
 .draft-rogue-layer{position:fixed;inset:0;z-index:2147483000;background:#061008;overflow:hidden}
 .draft-rogue-layer iframe{display:block;width:100%;height:100%;border:0;touch-action:none;background:#102513}
-.draft-rogue-exit{position:fixed;z-index:2147483001;top:calc(env(safe-area-inset-top,0px) + 8px);left:calc(env(safe-area-inset-left,0px) + 8px);
-  min-height:36px;padding:6px 10px;border:2px solid #07162f;border-radius:4px;background:rgba(12,35,77,.88);color:#ffe066;
-  box-shadow:0 0 0 2px rgba(135,185,255,.75);font:700 14px/1.1 system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
-.draft-rogue-exit:active{transform:translateY(2px)}
 </style>
 </head>
 <!-- version: v100 · traspaso automático de la partida al cambiar de dirección (sello oculto desde v55) -->
@@ -538,9 +534,7 @@ async function iniciarRogueMatch(homeId,awayId){
   var payload={type:'draft:start-match',teams:{A:myTeam,B:rivalTeam},golden:!!window.GOL_ORO_CARRERA,difficulty:'medio'};
   var layer=document.createElement('div');layer.id='draftRogueLayer';layer.className='draft-rogue-layer';
   var frame=document.createElement('iframe');frame.title='Partido de Inazuma Rogue';frame.setAttribute('allow','autoplay; fullscreen; gamepad');frame.setAttribute('allowfullscreen','');
-  var back=document.createElement('button');back.type='button';back.className='draft-rogue-exit';back.textContent='← Draft';back.setAttribute('aria-label','Salir del partido y volver a Inazuma Draft');
-  back.addEventListener('click',function(){exitMatch()});
-  layer.appendChild(frame);layer.appendChild(back);document.body.appendChild(layer);
+  layer.appendChild(frame);document.body.appendChild(layer);
   var state={frame:frame,layer:layer,mySide:mySide,payload:payload,timer:0,started:false,onMessage:null};
   state.onMessage=function(event){
     if(event.source!==frame.contentWindow||event.origin!==location.origin)return;
