@@ -3631,8 +3631,10 @@ class MatchScene extends Phaser.Scene {
     this.camInit = false;
     for (const t of Object.values(this.trails)) t.stop();
     this.tfx.reset();
+    const F = Logic.FIELD, m = F.margin * PX;
     this.cameras.main.setFollowOffset(0, s.settings.spectator ? 0 : 60);
     this.cameras.main.setZoom(s.settings.spectator ? 0.82 : 1);
+    this.cameras.main.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
   }
 
   fxRing(x, y, color, scale, depth, width = 4) {
