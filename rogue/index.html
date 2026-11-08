@@ -1033,6 +1033,7 @@ const Logic = (() => {
 
   // Qué técnica usaría ahora el jugador al pulsar el botón (según la situación)
   function contextTech(s, p) {
+    if (!p) return null;
     const b = s.ball;
     if (b.owner === p) {
       if (anyTech(p, 'tiro') && goalDist(p) < 22) return pickReady(p, 'tiro');
@@ -3414,7 +3415,7 @@ const UI = (() => {
     const me = Logic.controlled(s), b = s.ball;
     el.textContent = `FPS ${fps.toFixed(0)} · velocidad ${GAME_SPEED} · ${s.settings.difficulty}\n` +
       `balón ${Math.hypot(b.vx, b.vy).toFixed(1)} m/s · z ${b.z.toFixed(1)}${b.shot ? ' · tiro ' + b.shot.power.toFixed(0) : ''}\n` +
-      `${me.name}: ${me.techs.map(t => t.name + ' ' + Math.ceil(me.cd[t.id] || 0) + 's').join(' · ') || 'sin técnicas'}`;
+      `${me ? me.name + ': ' + (me.techs.map(t => t.name + ' ' + Math.ceil(me.cd[t.id] || 0) + 's').join(' · ') || 'sin técnicas') : 'Espectador · sin jugador controlado'}`;
   }
   function update(s) {
     debug(s);
@@ -3813,8 +3814,8 @@ class MatchScene extends Phaser.Scene {
       g.lineStyle(2, 0xffffff, 0.8).strokeEllipse(sh.x, sh.y, r * 1.6, r * 1.8);
     }
     this.shield.length = 0;
-    const x = me.x * PX, y = me.y * PX;
-    if (!s.settings.spectator && me.stamina < 0.99) {
+    const x = me ? me.x * PX : 0, y = me ? me.y * PX : 0;
+    if (!s.settings.spectator && me && me.stamina < 0.99) {
       g.fillStyle(0x000000, 0.5).fillRect(x - 15, y + 26, 30, 4);
       g.fillStyle(me.tired ? 0xe04a3a : 0x7ee36a).fillRect(x - 15, y + 26, 30 * me.stamina, 4);
     }
