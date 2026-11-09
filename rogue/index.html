@@ -3784,7 +3784,9 @@ class MatchScene extends Phaser.Scene {
     this.tfx.reset();
     const F = Logic.FIELD, m = F.margin * PX;
     this.cameras.main.setFollowOffset(0, s.settings.spectator ? 0 : 60);
-    this.cameras.main.setZoom(s.settings.spectator ? 0.82 : 1);
+    // En los partidos de carrera Draft, acercar claramente los jugadores sin
+    // cambiar el zoom ni la cámara de los demás modos Rogue.
+    this.cameras.main.setZoom(ROGUE_EMBED && s.settings.draftClock ? 1.5 : (s.settings.spectator ? 0.82 : 1));
     this.cameras.main.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
   }
 
@@ -4104,7 +4106,7 @@ class TechFX {
       case 'techStart': {
         const p = P(e.id), t = p && p.techs.find(x => x.name === e.name);
         UI.cutin(e.name, e.elem, e.team, e.kind, p && p.sprite, e.kind === 'tiro' || e.kind === 'parada' ? 1250 : 800);
-        if (t && (e.kind === 'tiro' || e.kind === 'parada')) { this.zoomBack = false; this.sc.cameras.main.zoomTo(1.3, 220, 'Sine.easeOut', true); }
+        if (t && (e.kind === 'tiro' || e.kind === 'parada')) { this.zoomBack = false; this.sc.cameras.main.zoomTo(ROGUE_EMBED && s.settings.draftClock ? 1.75 : 1.3, 220, 'Sine.easeOut', true); }
         break;
       }
       case 'techKick': {
@@ -4169,8 +4171,9 @@ class TechFX {
     this.setCine(cine);
     this.dim.fillAlpha += ((s.tech ? 0.5 : cine ? 0.3 : 0) - this.dim.fillAlpha) * Math.min(1, dt * 10);
     if (cine) this.speedLines(time);
-    if (!s.tech && !flying && !gkOn && this.sc.cameras.main.zoom > 1.01 && !this.zoomBack) {
-      this.zoomBack = true; this.sc.cameras.main.zoomTo(1, 300, 'Sine.easeInOut', true, (c, p) => { if (p >= 1) this.zoomBack = false; });
+    const baseZoom172 = ROGUE_EMBED && s.settings.draftClock ? 1.5 : 1;
+    if (!s.tech && !flying && !gkOn && this.sc.cameras.main.zoom > baseZoom172 + 0.01 && !this.zoomBack) {
+      this.zoomBack = true; this.sc.cameras.main.zoomTo(baseZoom172, 300, 'Sine.easeInOut', true, (c, p) => { if (p >= 1) this.zoomBack = false; });
     }
 
     // 1) Carga de la técnica (antes del disparo / regate / bloqueo)
