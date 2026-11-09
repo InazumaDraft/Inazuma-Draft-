@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Inazuma Draft">
 <meta name="application-name" content="Inazuma Draft">
-<meta name="idraft-build" content="170">
+<meta name="idraft-build" content="171">
 <!-- v102 · que el juego no salga en Google ni en ningún buscador -->
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="googlebot" content="noindex, nofollow">
@@ -587,7 +587,7 @@ async function iniciarRogueMatch(homeId,awayId){
   window.__draftRogueBridge=state;
   window.addEventListener('message',state.onMessage);
   state.timer=setTimeout(function(){if(!state.started)fallarRogueMatch('no se recibió la señal de inicio')},45000);
-  frame.src='rogue/index.html?embed=1&v=170';
+  frame.src='rogue/index.html?embed=1&v=171';
 }
 
 // El motor Rogue carga sus propias hojas: no bloquearlo por la precarga del motor antiguo.

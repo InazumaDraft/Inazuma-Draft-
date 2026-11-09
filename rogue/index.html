@@ -3783,25 +3783,9 @@ class MatchScene extends Phaser.Scene {
     for (const t of Object.values(this.trails)) t.stop();
     this.tfx.reset();
     const F = Logic.FIELD, m = F.margin * PX;
-    const cam = this.cameras.main;
-    cam.setFollowOffset(0, s.settings.spectator ? 0 : 60);
-    cam.setZoom(s.settings.spectator ? 0.82 : 1);
-    cam.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
-    if (ROGUE_EMBED && s.settings.draftClock) {
-      // Campo completo en móvil: el tamaño depende de la pantalla, no del zoom del motor 5v5.
-      cam.stopFollow(); this.draftCameraSize169 = '';
-      this.fitDraftPitch169();
-    } else cam.startFollow(this.camT, true, 1, 1);
-  }
-
-  fitDraftPitch169() {
-    const cam = this.cameras.main, F = Logic.FIELD;
-    const key = cam.width + ':' + cam.height;
-    if (key === this.draftCameraSize169) return;
-    this.draftCameraSize169 = key;
-    // Reserva espacio para el marcador superior y controles inferiores.
-    const zoom = Math.min(cam.width / (F.w * PX + 100), Math.max(40, cam.height - 130) / (F.l * PX + 100));
-    cam.removeBounds(); cam.setZoom(zoom); cam.centerOn(F.w * PX / 2, F.l * PX / 2);
+    this.cameras.main.setFollowOffset(0, s.settings.spectator ? 0 : 60);
+    this.cameras.main.setZoom(s.settings.spectator ? 0.82 : 1);
+    this.cameras.main.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
   }
 
   fxRing(x, y, color, scale, depth, width = 4) {
@@ -3883,7 +3867,6 @@ class MatchScene extends Phaser.Scene {
     }
 
     this.tfx.update(s, time, delta);
-    if (ROGUE_EMBED && s.settings.draftClock) this.fitDraftPitch169();
     const spectator = !!s.settings.spectator, me = Logic.controlled(s), bl = s.ball;
     const foc = spectator ? { x: bl.x * PX, y: bl.y * PX, z: 1 } : this.tfx.focus(s, me);
     let tx = foc.x, ty = foc.y;
