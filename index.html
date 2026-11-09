@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Inazuma Draft">
 <meta name="application-name" content="Inazuma Draft">
-<meta name="idraft-build" content="165">
+<meta name="idraft-build" content="166">
 <!-- v102 · que el juego no salga en Google ni en ningún buscador -->
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="googlebot" content="noindex, nofollow">
@@ -525,7 +525,7 @@ async function iniciarRogueMatch(homeId,awayId){
   var packed=await Promise.all([packTeam(mySide),packTeam(1-mySide)]);
   var myTeam=packed[0],rivalTeam=packed[1];
   var preparingDone=document.getElementById('draftRoguePreparing');if(preparingDone)preparingDone.remove();
-  var payload={type:'draft:start-match',teams:{A:myTeam,B:rivalTeam},golden:!!window.GOL_ORO_CARRERA,difficulty:'medio',soundEnabled:typeof Sfx==='undefined'||Sfx.enabled!==false};
+  var payload={type:'draft:start-match',teams:{A:myTeam,B:rivalTeam},golden:!!window.GOL_ORO_CARRERA,mySide:mySide,difficulty:'medio',soundEnabled:typeof Sfx==='undefined'||Sfx.enabled!==false};
   var layer=document.createElement('div');layer.id='draftRogueLayer';layer.className='draft-rogue-layer';
   var frame=document.createElement('iframe');frame.title='Partido de Inazuma Rogue';frame.setAttribute('allow','autoplay; fullscreen; gamepad');frame.setAttribute('allowfullscreen','');
   layer.appendChild(frame);
@@ -552,7 +552,7 @@ async function iniciarRogueMatch(homeId,awayId){
   window.__draftRogueBridge=state;
   window.addEventListener('message',state.onMessage);
   state.timer=setTimeout(function(){if(!state.started)fallarRogueMatch('no se recibió la señal de inicio')},45000);
-  frame.src='rogue/index.html?embed=1&v=165';
+  frame.src='rogue/index.html?embed=1&v=166';
 }
 
 // El motor Rogue carga sus propias hojas: no bloquearlo por la precarga del motor antiguo.

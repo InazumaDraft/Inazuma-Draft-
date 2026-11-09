@@ -63,6 +63,19 @@ img,.pix,.crest{image-rendering:pixelated}
 .score .team img{width:16px;height:16px;flex-shrink:0;image-rendering:pixelated}
 .score .goals{padding:0 6px;font-size:18px;background:var(--navy-d);color:var(--yellow);display:flex;align-items:center;gap:4px}
 .score .clock{padding:1px 6px;font-size:12px;display:flex;align-items:center;border-left:2px solid var(--ink);white-space:nowrap;color:var(--gold)}
+/* En Draft A sigue siendo el equipo del usuario en la simulación; solo cambia el orden visual. */
+.hud.away .team:first-child{order:2;flex-direction:row-reverse}
+.hud.away .goals{order:1;flex-direction:row-reverse}
+.hud.away .team:nth-child(3){order:0;flex-direction:row-reverse}
+.hud.away .clock{order:3}
+body.rogue-embedded.rogue-spectator .hud{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:480px), (max-height:500px){
+  body.rogue-embedded.rogue-spectator .hud{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+  body.rogue-embedded.rogue-spectator .score .team,
+  body.rogue-embedded.rogue-spectator .score .clock{font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:700;line-height:1.25}
+  body.rogue-embedded.rogue-spectator .score .goals{font-family:system-ui,-apple-system,sans-serif;font-size:18px;font-weight:800;line-height:1.25}
+  body.rogue-embedded.rogue-spectator .score .team span{max-width:min(90px,20vw)}
+}
 #pauseBtn{position:absolute;z-index:6;pointer-events:auto;width:38px;height:38px;
   top:calc(env(safe-area-inset-top,0px) + 8px);right:max(16px,env(safe-area-inset-right,0px));
   background:var(--navy);border:2px solid var(--ink);box-shadow:0 0 0 2px var(--line);color:var(--gold);font:18px var(--font-ui);cursor:pointer}
@@ -1450,10 +1463,17 @@ const Logic = (() => {
   // En el Draft dos compañeros cercanos se ofrecen a una distancia de pase corta.
   function supportOffer(s, owner, p) {
     if (!s.settings.spectator || p === owner || p.team !== owner.team || p.role === 'POR' || p.stun > 0) return false;
-    const options = s.players.filter(m => m.team === owner.team && m !== owner && m.role !== 'POR' && m.stun <= 0)
-      .map(m => ({ p: m, d: dist(m, owner) })).filter(x => x.d >= 6 && x.d <= 25)
-      .sort((a, b) => a.d - b.d);
-    return options.slice(0, 2).some(x => x.p === p);
+    // Mismo orden estable que el sort anterior, sin crear y ordenar arrays por jugador y fotograma.
+    const d = dist(p, owner); if (d < 6 || d > 25) return false;
+    let ahead = 0;
+    for (const m of s.players) {
+      if (m === p) continue;
+      if (m.team !== owner.team || m === owner || m.role === 'POR' || m.stun > 0) continue;
+      const md = dist(m, owner);
+      if (md < 6 || md > 25) continue;
+      if (md < d || (md === d && s.players.indexOf(m) < s.players.indexOf(p))) if (++ahead >= 2) return false;
+    }
+    return true;
   }
 
   // Tras una parada, el portero busca primero un defensor con línea limpia y rival lejos.
@@ -1514,15 +1534,19 @@ const Logic = (() => {
 
   function defendAI(s, p, dt) {
     const h = s.ball.owner, gy = ownGoalY(p.team);
-    const pressers = s.players.filter(q => q.team === p.team && q.role !== 'POR' && q.stun <= 0 && (s.settings.spectator || q.id !== s.controlledId))
-      .sort((a, q) => dist(a, h) - dist(q, h));
     if (h.role === 'POR') {   // portero con el balón: no se le puede robar, así que se cubren los pases
       const o = (s.marks && s.marks[p.id]) || null;
       if (o && o !== h) { const gx = cx - o.x, gl = Math.hypot(gx, h.y - o.y) || 1; moveTo(s, p, o.x + gx / gl * 1.2, o.y + (h.y - o.y) / gl * 1.2, false); }
       else { const t = toAbs(h.team, 0, F.boxD + 3); moveTo(s, p, t.x + (p.x - cx) * 0.6, t.y, false); }
       return;
     }
-    if (pressers[0] === p) {
+    // Solo se usa el primer defensor: buscar el más cercano evita ordenar diez veces.
+    let presser = null, nearest = Infinity;
+    for (const q of s.players) {
+      if (q.team !== p.team || q.role === 'POR' || q.stun > 0 || (!s.settings.spectator && q.id === s.controlledId)) continue;
+      const d = dist(q, h); if (d < nearest) { nearest = d; presser = q; }
+    }
+    if (presser === p) {
       // Presión: va a donde estará el rival (no a donde está), siempre por el lado de su portería
       const fx = h.x + h.vx * 0.35, fy = h.y + h.vy * 0.35;
       const gx = cx - fx, gyy = gy - fy, gl = Math.hypot(gx, gyy) || 1;
@@ -3707,7 +3731,7 @@ class MatchScene extends Phaser.Scene {
     cam.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
     cam.setFollowOffset(0, 60);
     this.camT = { x: 0, y: 0 };          // punto que sigue la cámara; se desliza suave hacia tu jugador
-    cam.startFollow(this.camT, true, 1, 1);
+    cam.startFollow(this.camT, !ROGUE_EMBED, 1, 1); // En Draft conserva posiciones subpíxel para un desplazamiento más suave.
     this.camInit = false;
     this.tfx = new TechFX(this);
     App.scene = this;
@@ -3772,7 +3796,9 @@ class MatchScene extends Phaser.Scene {
   update(time, delta) {
     const s = App.match;
     if (!s || !this.views.size) return;
+    const previousSimTime = s.t;
     if (App.running) Logic.update(s, Input.read(), Math.min(delta / 1000, 0.05)); else Input.read();
+    const animDelta = Math.max(0, s.t - previousSimTime);
 
     for (const p of s.players) {
       const v = this.views.get(p.id);
@@ -3792,12 +3818,14 @@ class MatchScene extends Phaser.Scene {
       else if (techP || p.windup || (s.shoot.charging && p.id === s.controlledId)) f = ANIM.kick[di][0];
       else if (spd > 0.6) {
         // La animación avanza según la distancia recorrida: los pies no patinan
-        v.animT += delta / 1000 * spd * 13 * GAME_SPEED;
+        v.animT += animDelta * spd * 13;
         let t = v.animT % 28, k = 0;
         while (t >= ANIM.runT[k]) { t -= ANIM.runT[k]; k++; }
         f = ANIM.run[di][k];
       }
-      v.spr.setFrame(p.row * NF + FR[f]).setFlipX(flip);
+      const frame = p.row * NF + FR[f];
+      if (v.lastFrame !== frame) { v.spr.setFrame(frame); v.lastFrame = frame; }
+      if (v.spr.flipX !== flip) v.spr.setFlipX(flip);
       if (down !== !!v.down) { v.down = down; v.spr.setAngle(down ? (flip ? -82 : 82) : 0).setY(down ? -10 : 0); }
       if (p.tackle) {   // carga: estela de polvo y un fantasma detrás
         this.dust.setDepth(p.y * PX - 1); this.dust.emitParticleAt(p.x * PX, p.y * PX, 2);
@@ -6630,6 +6658,7 @@ const App = (() => {
     api.mode = 'draft';
     draftSoundEnabled165 = payload.soundEnabled !== false;
     api.spectator = true;
+    $('hud').classList.toggle('away', payload.mySide === 1);
     document.body.classList.add('rogue-spectator');
     api.draftNames = { A: payload.teams.A.name, B: payload.teams.B.name };
     api.draftCrests = { A: payload.teams.A.crest || '', B: payload.teams.B.crest || '' };
