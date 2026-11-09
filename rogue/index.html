@@ -6518,7 +6518,17 @@ const App = (() => {
         if (Number.isFinite(draftValue) && draftValue > 0) return Math.round(draftValue * 0.7 + rating * 0.3);
         return Math.round(base ? base * 0.45 + rating * 0.55 : rating);
       };
-      const techs = mapped ? startingTechs(pd) : [];
+      // En Draft no ocupar los dos huecos con variantes duplicadas del mismo movimiento.
+      const techs = mapped ? (() => {
+        const out = [], seen = new Set();
+        function add(id) { const t = TECH(id); if (!t) return; const k = t.type + ':' + String(t.name).toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(id); } }
+        startingTechs(pd).forEach(add);
+        if (out.length < TECH_SLOTS) {
+          const want = pd.role === 'DEF' ? ['bloqueo', 'regate'] : pd.role === 'POR' ? ['bloqueo'] : ['regate', 'bloqueo'];
+          for (const type of want) { for (const move of pd.moves) { if (out.length >= TECH_SLOTS) break; if (TECH(move[0]) && TECH(move[0]).type === type) add(move[0]); } }
+        }
+        return out.slice(0, TECH_SLOTS);
+      })() : [];
       const matchPlayer = buildMatchPlayer(pd.id, role, stat, techs, [], side * 11 + i, positions[i]);
       matchPlayer.stamDrain = +(1.3 - rating / 200).toFixed(2);
       if (role === 'POR') {
@@ -6530,7 +6540,7 @@ const App = (() => {
       matchPlayer.sprite = sprite;
       // Diagnóstico del once: permite comprobar que ningún puesto usa un muñeco de respaldo.
       if (ROGUE_EMBED) onceDebug.push({ name: matchPlayer.name, side, role, mapped: mapped,
-        id: pd && pd.id != null ? Number(pd.id) : null, sprite: { file: String(sprite.file), row: Number(sprite.row) || 0 } });
+        id: pd && pd.id != null ? Number(pd.id) : null, techs: matchPlayer.techs.map(t => ({ id: t.id, name: t.name, type: t.type })), sprite: { file: String(sprite.file), row: Number(sprite.row) || 0 } });
       return matchPlayer;
     });
     if (ROGUE_EMBED) {
