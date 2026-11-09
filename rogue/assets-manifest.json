@@ -78,6 +78,7 @@
     "sprites/c80.png": 171154,
     "sprites/c81.png": 169668,
     "sprites/c82.png": 170171,
+    "sprites/c83.png": 171702,
     "sprites/c90.png": 171828,
     "sprites/c92.png": 169821,
     "sprites/c95.png": 172102,
@@ -147,6 +148,7 @@
     "sprites/f80.png": 31091,
     "sprites/f81.png": 32657,
     "sprites/f82.png": 35020,
+    "sprites/f83.png": 36586,
     "sprites/f90.png": 33256,
     "sprites/f92.png": 34280,
     "sprites/f95.png": 37245,
@@ -555,6 +557,10 @@
       "size": 170171,
       "sha256": "c0f1bd911d287f31049f671c97c2619bf9c9003d89a8a3c665f823c6aedae1cb"
     },
+    "sprites/c83.png": {
+      "size": 171702,
+      "sha256": "445b961e116e921ed0cd71022fc017f23178a8d8853d27da7a95c26bcaace310"
+    },
     "sprites/c90.png": {
       "size": 171828,
       "sha256": "3613df37941e6faf52cf42badb6ceb4e92f84881989ca0089696153574513a27"
@@ -830,6 +836,10 @@
     "sprites/f82.png": {
       "size": 35020,
       "sha256": "058c6148ff92e998c181c2db4ee29fc5e16616169efe14f094355c1abc976fe8"
+    },
+    "sprites/f83.png": {
+      "size": 36586,
+      "sha256": "af2bb3339c62c4344fab220cf10182bc56d70c63db23c53d7048cbd0d07bed2f"
     },
     "sprites/f90.png": {
       "size": 33256,

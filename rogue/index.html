@@ -6402,12 +6402,13 @@ const App = (() => {
     const pool = GAME.teams.filter(t => t.players && t.players.length);
     return pool[hash % pool.length].key;
   }
-  function draftPlayerFor(record, role) {
+  function draftPlayerFor(record, role, draftId) {
     const map = window.RogueDraftMap || {};
     const entry = map[String(record.face || '')];
     const id = typeof entry === 'number' ? entry : entry && entry.id;
     const mapped = id != null ? PLAYER(id) : null;
-    if (mapped && draftIdentityMatch(record.name, mapped)) return mapped;
+    // Alpino's six IE2 additions are an intentional, role-verified identity-to-sprite mapping.
+    if (mapped && (draftId === 'alpino' ? mapped.role === role : draftIdentityMatch(record.name, mapped))) return mapped;
     const wanted = draftNorm(record.name);
     if (!wanted) return null;
     const matches = GAME.players.filter(p => p.cs && (draftNorm(p.full) === wanted || draftNorm(p.name) === wanted || draftNorm(p.nick) === wanted));
@@ -6430,12 +6431,19 @@ const App = (() => {
     if (out.length !== 11) throw new Error('No se pudo completar el once de ' + (team.name || '') + '.');
     return out;
   }
-  function draftTemplatePlayer(role, used) {
+  function draftTemplatePlayer(role, used, draftId) {
     const pool = GAME.players.filter(p => p.cs);
     const available = p => {
       const ref = Sprites.refOf(p), key = String(ref.file) + ':' + Number(ref.row);
       return !(used && used.ids.has(Number(p.id))) && !(used && used.refs.has(key));
     };
+    if (draftId === 'alpino') {
+      const ids = (window.RogueDraftAlpinoCandidates || {})[role] || [];
+      for (const id of ids) {
+        const candidate = PLAYER(id);
+        if (candidate && candidate.cs && candidate.role === role && available(candidate)) return candidate;
+      }
+    }
     return pool.find(p => p.role === role && available(p)) || pool.find(available)
       || pool.find(p => p.role === role) || pool[0] || null;
   }
@@ -6449,13 +6457,13 @@ const App = (() => {
     const usedAssets = sharedAssets || { ids: new Set(), refs: new Set() };
     const nativeMembers = draftId === 'raimon' ? new Map() : new Map((rogueTeam && rogueTeam.players || []).map(m => [Number(m.id), m]));
     const players = chosen.map(({ record, role }, i) => {
-      let pd = draftPlayerFor(record, role);
+      let pd = draftPlayerFor(record, role, draftId);
       let mapped = !!(pd && pd.cs);
       if (mapped) {
         const mappedRef = Sprites.refOf(pd), mappedKey = String(mappedRef.file) + ':' + Number(mappedRef.row);
         if (usedAssets.ids.has(Number(pd.id)) || usedAssets.refs.has(mappedKey)) mapped = false;
       }
-      if (!mapped) pd = draftTemplatePlayer(role, usedAssets);
+      if (!mapped) pd = draftTemplatePlayer(role, usedAssets, draftId);
       if (!pd || !pd.cs) throw new Error('No se encontró un perfil Rogue base para ' + (record.name || role));
       const native = mapped ? nativeMembers.get(Number(pd.id)) : null;
       let teamKeeper = draftId !== 'raimon' && !native && role === 'POR' && rogueTeam ? rogueTeam.players.find(m => m.role === 'POR') : null;
@@ -6512,6 +6520,8 @@ const App = (() => {
     api.draftDifficulty = payload.difficulty || 'medio';
     api.match = null; api.matchSheet = null; api.running = false;
     try {
+      // Desbloquea Web Audio en el arranque del partido sin tocar cfg.music/sfx ni sus volúmenes guardados.
+      Sound.unlock();
       const usedAssets = { ids: new Set(), refs: new Set() };
       const A = buildDraftRogueTeam(payload.teams.A, 0, usedAssets);
       const B = buildDraftRogueTeam(payload.teams.B, 1, usedAssets);
@@ -6531,8 +6541,9 @@ const App = (() => {
     Controls.apply();
     if (ROGUE_EMBED) {
       document.body.classList.add('rogue-embedded');
-      Sound.cfg.teamThemes = false;
-      Sound.cfg.roles.match = 'random'; Sound.cfg.roles.goal = 'j13'; Sound.cfg.roles.win = 'j01'; Sound.cfg.roles.lose = 'j07';
+      // Si el navegador bloquea el primer resume al cargar el iframe, el primer toque/tecla lo habilita.
+      document.addEventListener('pointerdown', () => Sound.unlock(), { once: true, capture: true });
+      document.addEventListener('keydown', () => Sound.unlock(), { once: true, capture: true });
       screen('<h2>Conectando con Inazuma Draft…</h2><p class="note">Preparando el partido original de Rogue.</p>', 'bg_title');
       return;
     }
