@@ -533,6 +533,7 @@ details.techs .cards{margin-top:6px}
 <script>
 const ROGUE_EMBED = new URLSearchParams(location.search).get('embed') === '1';
 const ROGUE_TARGET_ORIGIN = location.origin === 'null' ? '*' : location.origin;
+let draftSoundEnabled165 = true;
 function rogueNotify(type, payload = {}) {
   if (!ROGUE_EMBED || window.parent === window) return;
   try { window.parent.postMessage(Object.assign({ source: 'inazuma-rogue', type }, payload), ROGUE_TARGET_ORIGIN); } catch (_) {}
@@ -638,13 +639,18 @@ const Sprites = (() => {
   const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const lum = c => c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114;
   const KIT_A = [[213, 180, 16], [164, 131, 16]], KIT_B = [[57, 82, 123], [74, 131, 172], [57, 131, 197], [65, 65, 139], [57, 82, 139], [74, 106, 189], [41, 98, 123]];
+  // La colección usa un uniforme de portero naranja/azul común. Solo se
+  // recolorea esa paleta, no la piel ni la cara, cuando cambia de club.
+  const GK_A = [[172,57,16],[238,106,32],[180,90,16],[255,139,32]],
+        GK_B = [[41,98,123],[32,65,82],[41,82,98],[57,123,156]];
   function kitMap(kit) {
     const m = new Map(), A = hex(kit.a), B = hex(kit.b);
     const put = (src, tgt, ref) => src.forEach(s => {
       const k = lum(s) / ref, o = tgt.map(v => Math.max(0, Math.min(255, Math.round(v * k + (k > 1 ? (k - 1) * 60 : 0)))));
       m.set((s[0] << 16) | (s[1] << 8) | s[2], o);
     });
-    put(KIT_A, A, lum(KIT_A[0])); put(KIT_B, B, lum([57, 131, 197]));
+    if (kit.keeper) { put(GK_A, A, lum([255,139,32])); put(GK_B, B, lum([57,123,156])); }
+    else { put(KIT_A, A, lum(KIT_A[0])); put(KIT_B, B, lum([57, 131, 197])); }
     return m;
   }
   function recolor(g, w, y0, kit) {
@@ -805,6 +811,7 @@ const Sound = (() => {
   }
   // Jingle corto encima de la música (gol, victoria…)
   async function jingle(role) {
+    if (ROGUE_EMBED) return; // no mezclar la música de Rogue con la pista elegida en Draft
     const key = role && cfg.roles[role];
     if (!ctx || !key || !TRACKS[key]) return;
     let buf; try { buf = await load(key); } catch (_) { return; }
@@ -847,7 +854,7 @@ const Sound = (() => {
     click: () => tone('square', 900, 700, 0.04, 0.12),
     reveal: () => { tone('triangle', 520, 1040, 0.25, 0.25); tone('sine', 780, 1560, 0.3, 0.15, 0.05); },
   };
-  function sfx(name) { if (ctx && cfg.sfx && FX[name]) { try { FX[name](); } catch (_) {} } }
+  function sfx(name) { if (ctx && cfg.sfx && (!ROGUE_EMBED || draftSoundEnabled165) && FX[name]) { try { FX[name](); } catch (_) {} } }
 
   function setMusic(on) { cfg.music = on; saveCfg(); if (musicGain) musicGain.gain.value = on ? 0.55 * (cfg.mv ?? 1) : 0; }
   function setSfx(on) { cfg.sfx = on; saveCfg(); if (sfxGain) sfxGain.gain.value = on ? 0.7 * (cfg.sv ?? 1) : 0; }
@@ -871,6 +878,13 @@ const DIFF = {
 };
 let GAME_SPEED = 0.75;   // todo el juego un 25 % más pausado (el reloj del partido no cambia)
 
+// Reloj visual para Draft: la duración y la simulación no cambian.
+function draftMinute165(s) {
+  if (s.golden) return Math.min(120, 91 + Math.floor(Math.max(0, 60 - Number(s.time || 0)) * 30 / 60));
+  const total = Math.max(1, Number(s.settings.minutes) * 60);
+  const elapsed = Math.max(0, Math.min(total, total - Number(s.time || 0)));
+  return Math.min(90, 1 + Math.floor(elapsed * 90 / total));
+}
 const Logic = (() => {
   // Campo para 5 contra 5 (provisional)
   const F5 = { w: 34, l: 52, margin: 4, goalW: 5.5, goalDepth: 1.5, barZ: 2.0,
@@ -1755,7 +1769,7 @@ const Logic = (() => {
     s.score[team]++;
     s.ball.fire = null;
     const scorer = s.ball.shot && s.players.find(q => q.id === s.ball.shot.by && q.team === team);
-    (s.goalLog = s.goalLog || []).push({ team, key: scorer ? scorer.key : null, name: scorer ? scorer.name : null, minute: Math.max(1, Math.floor((s.settings.minutes * 60 - s.time) / 60)), tech: s.ball.shot && s.ball.shot.tech ? s.ball.shot.tech.name : null });
+    (s.goalLog = s.goalLog || []).push({ team, key: scorer ? scorer.key : null, name: scorer ? scorer.name : null, minute: s.settings.draftClock ? draftMinute165(s) : Math.max(1, Math.floor((s.settings.minutes * 60 - s.time) / 60)), tech: s.ball.shot && s.ball.shot.tech ? s.ball.shot.tech.name : null });
     s.events.push({ type: 'goal', team, x: s.ball.x, y: s.ball.y, tech: s.ball.shot && s.ball.shot.tech ? s.ball.shot.tech.elem : null });
     if (s.ball.shot && s.ball.shot.tech) s.hitstop = 0.3;
     if (s.golden) { s.pause = { t: 2.0, then: () => finish(s) }; return; }
@@ -3460,7 +3474,7 @@ const UI = (() => {
   }
   function update(s) {
     debug(s);
-    const clock = (s.golden ? 'Oro ' : '') + Math.floor(s.time / 60) + ':' + String(Math.floor(s.time % 60)).padStart(2, '0');
+    const clock = s.settings.draftClock ? (s.golden ? 'Oro ' : '') + draftMinute165(s) + '′' : (s.golden ? 'Oro ' : '') + Math.floor(s.time / 60) + ':' + String(Math.floor(s.time % 60)).padStart(2, '0');
     if (last.clock !== clock) { $('clock').textContent = clock; last.clock = clock; }
     if (last.a !== s.score.A) { $('sA').textContent = s.score.A; last.a = s.score.A; }
     if (last.b !== s.score.B) { $('sB').textContent = s.score.B; last.b = s.score.B; }
@@ -5302,7 +5316,7 @@ const App = (() => {
   async function startMatch(teams, golden, field, musicRole, rival) {
     GAME_SPEED = settings.dev && settings.speed ? +settings.speed : 0.75;
     const spectator = !!api.spectator;
-    const s = Object.assign({}, settings, { golden, field, spectator, allAI: spectator || !!settings.allAI, difficulty: api.mode === 'draft' ? (api.draftDifficulty || 'medio') : api.mode === 'run' ? api.run.diff : api.mode === 'career' || api.mode === 'wc' ? Career.matchDiff() : 'facil' });
+    const s = Object.assign({}, settings, { golden, field, spectator, draftClock: api.mode === 'draft', allAI: spectator || !!settings.allAI, difficulty: api.mode === 'draft' ? (api.draftDifficulty || 'medio') : api.mode === 'run' ? api.run.diff : api.mode === 'career' || api.mode === 'wc' ? Career.matchDiff() : 'facil' });
     screen('<h2>Cargando…</h2>');
     try {
       api.matchSheet = await Sprites.matchSheet([...teams.A.players, ...teams.B.players].map(p => p.sprite));
@@ -5319,7 +5333,8 @@ const App = (() => {
     api.scene && api.scene.bind(api.match, api.matchSheet);
     show(null);
     api.running = true;
-    Sound.music(musicRole || 'match', rival);
+    // En Draft la música la controla el reproductor y la selección de Inazuma Draft.
+    if (!(ROGUE_EMBED && api.mode === 'draft')) Sound.music(musicRole || 'match', rival);
     if (field && field !== 'normal') UI.toast(FIELD_LABEL[field] || '', 1600);
   }
   function startQuick() {
@@ -6489,6 +6504,24 @@ const App = (() => {
     return pool.find(p => p.role === role && available(p)) || pool.find(available)
       || pool.find(p => p.role === role) || pool[0] || null;
   }
+  // Colores de portero por club para fichajes que usan la hoja de colección.
+  // Los sprites nativos de los rivales conservan su equipación original.
+  const DRAFT_GK_KITS_165 = Object.freeze({
+    raimon:['#ff8b20','#397b9c'], imperial:['#906039','#7b5a9c'], occult:['#d52929','#393939'],
+    wild:['#52a44a','#943973'], shuriken:['#8373a4','#b4bdc5'], kirkwood:['#c5b46a','#315a83'],
+    zeus:['#8b7339','#6a6273'], otaku:['#39734a','#523918'], farm:['#d5834a','#6a9c9c'],
+    brain:['#bd9439','#6a4a29'], umbrella:['#5a8b4a','#314a83'], ogro:['#9c2931','#393139'],
+    angeloscuro:['#8b5aac','#393139'], geminis:['#deded5','#8b5231'], epsilon:['#7352ac','#393139'],
+    genesis:['#397b31','#d5cdb4'], caos:['#494939','#7b6a4a'], alpino:['#bd6283','#733149'],
+    marytimes:['#398ba4','#294a6a'], fauxshore:['#735239','#c5bdac'], claustrosagrado:['#bd9c6a','#6a7339'],
+    royalredux:['#526a4a','#6a5239']
+  });
+  const DRAFT_GK_FALLBACK_165 = [ ['#9c3973','#4a395a'], ['#397b83','#294a6a'], ['#737339','#4a5231'], ['#8b5a39','#524a73'] ];
+  function draftKeeperKit(id) {
+    let kit = DRAFT_GK_KITS_165[id];
+    if (!kit) { let n = 0; for (const ch of String(id)) n = (n * 31 + ch.charCodeAt(0)) >>> 0; kit = DRAFT_GK_FALLBACK_165[n % DRAFT_GK_FALLBACK_165.length]; }
+    return { a:kit[0], b:kit[1], keeper:true };
+  }
   function buildDraftRogueTeam(team, side, sharedAssets) {
     const chosen = draftPickEleven(team);
     const roles = chosen.map(x => x.role);
@@ -6544,6 +6577,8 @@ const App = (() => {
       const hasNativeKit = !!(rogueTeam && rogueTeam.kit);
       if (role !== 'POR' && nativeKit && (/^c\d+\.png$/i.test(sprite.file) || (hasNativeKit && /^r\d+\.png$/i.test(sprite.file)))) {
         sprite.kit = Object.assign({}, nativeKit);
+      } else if (role === 'POR' && draftId !== 'raimon' && /^c\d+\.png$/i.test(sprite.file)) {
+        sprite.kit = draftKeeperKit(draftId);
       }
       // Si faltase una hoja, usar un muñeco entero y vestirlo con los colores de este equipo.
       const fallbackKit = nativeKit || (draftId === 'raimon' ? { a: '#D5B410', b: '#39527B' } : null);
@@ -6581,7 +6616,7 @@ const App = (() => {
       matchPlayer.sprite = sprite;
       // Diagnóstico del once: permite comprobar que ningún puesto usa un muñeco de respaldo.
       if (ROGUE_EMBED) onceDebug.push({ name: matchPlayer.name, side, role, mapped: mapped,
-        id: pd && pd.id != null ? Number(pd.id) : null, techs: matchPlayer.techs.map(t => ({ id: t.id, name: t.name, type: t.type })), sprite: { file: String(sprite.file), row: Number(sprite.row) || 0 } });
+        id: pd && pd.id != null ? Number(pd.id) : null, techs: matchPlayer.techs.map(t => ({ id: t.id, name: t.name, type: t.type })), sprite: { file: String(sprite.file), row: Number(sprite.row) || 0, kit: sprite.kit || null } });
       return matchPlayer;
     });
     if (ROGUE_EMBED) {
@@ -6593,6 +6628,7 @@ const App = (() => {
   api.startDraftMatch = async payload => {
     if (!ROGUE_EMBED || !payload || !payload.teams || !payload.teams.A || !payload.teams.B) return false;
     api.mode = 'draft';
+    draftSoundEnabled165 = payload.soundEnabled !== false;
     api.spectator = true;
     document.body.classList.add('rogue-spectator');
     api.draftNames = { A: payload.teams.A.name, B: payload.teams.B.name };
