@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Inazuma Draft">
 <meta name="application-name" content="Inazuma Draft">
-<meta name="idraft-build" content="162">
+<meta name="idraft-build" content="163">
 <!-- v102 · que el juego no salga en Google ni en ningún buscador -->
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="googlebot" content="noindex, nofollow">
@@ -527,8 +527,10 @@ async function iniciarRogueMatch(homeId,awayId){
   var payload={type:'draft:start-match',teams:{A:myTeam,B:rivalTeam},golden:!!window.GOL_ORO_CARRERA,difficulty:'medio'};
   var layer=document.createElement('div');layer.id='draftRogueLayer';layer.className='draft-rogue-layer';
   var frame=document.createElement('iframe');frame.title='Partido de Inazuma Rogue';frame.setAttribute('allow','autoplay; fullscreen; gamepad');frame.setAttribute('allowfullscreen','');
-  layer.appendChild(frame);document.body.appendChild(layer);
-  var state={frame:frame,layer:layer,mySide:mySide,payload:payload,timer:0,started:false,onMessage:null};
+  layer.appendChild(frame);
+  // Se puede cancelar incluso cuando la red o el dispositivo tardan en cargar.
+  var cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancelar carga';cancel.setAttribute('aria-label','Cancelar carga del partido');cancel.style.cssText='position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;z-index:2;padding:10px 14px;border:1px solid #a4c9fa;border-radius:8px;background:#102650;color:#fff;font:700 14px system-ui;cursor:pointer';cancel.onclick=function(){exitMatch()};layer.appendChild(cancel);document.body.appendChild(layer);
+  var state={frame:frame,layer:layer,cancel:cancel,mySide:mySide,payload:payload,timer:0,started:false,onMessage:null};
   state.onMessage=function(event){
     if(event.source!==frame.contentWindow||event.origin!==location.origin)return;
     var d=event.data||{};if(d.source!=='inazuma-rogue')return;
@@ -537,7 +539,7 @@ async function iniciarRogueMatch(homeId,awayId){
       state.timer=setTimeout(function(){if(!state.started)fallarRogueMatch('el motor no terminó de cargar los jugadores')},45000);
       frame.contentWindow.postMessage(payload,location.origin);
     }else if(d.type==='started'){
-      state.started=true;if(state.timer)clearTimeout(state.timer);state.timer=0;
+      state.started=true;if(state.cancel)state.cancel.remove();if(state.timer)clearTimeout(state.timer);state.timer=0;
     }else if(d.type==='result'){
       if(state.timer)clearTimeout(state.timer);state.timer=0;terminarRogueMatch(state,d);
     }else if(d.type==='exit'){
@@ -549,10 +551,11 @@ async function iniciarRogueMatch(homeId,awayId){
   window.__draftRogueBridge=state;
   window.addEventListener('message',state.onMessage);
   state.timer=setTimeout(function(){if(!state.started)fallarRogueMatch('no se recibió la señal de inicio')},45000);
-  frame.src='rogue/index.html?embed=1&v=162';
+  frame.src='rogue/index.html?embed=1&v=163';
 }
 
-function launchMatch(){if(window.MUNECO_ESPERA&&!window.MUNECO_ESPERA()){window.MUNECO_ENCOLAR(launchMatch);return}var p=$3("matchPick");if(p)p.classList.remove("is-open");var f=$3("matchEnd");if(f)f.classList.remove("is-open");var v=$3("viewMatch");if(v){v.classList.add("is-open");v.setAttribute("aria-hidden","false")}etiquetasResultado();document.body.classList.add("in-match");iniciarRogueMatch(Pick.home,Pick.away);clearInterval(vigia);vigia=setInterval(function(){if(M.fase==="fin"){clearInterval(vigia);vigia=0;try{if(window.Carrera)window.Carrera.guardarFinal149()}catch(e){}var sc=$3("mendScore"),rs=$3("mendRes"),fe=$3("matchEnd");if(typeof Sfx!=="undefined"&&Sfx.musica)Sfx.musica(false);if(typeof Sfx!=="undefined"&&Sfx.final)Sfx.final();if(typeof Sfx!=="undefined"&&Sfx.victoria)Sfx.victoria(true);var onp=document.getElementById("lvOnPitch");if(onp)onp.innerHTML="";lvTecKey=null;var emA=document.getElementById("mendEmA"),emB=document.getElementById("mendEmB");if(emA)emA.src=emblemaEq(0);if(emB)emB.src=emblemaEq(1);var nA=document.getElementById("mendNameA"),nB=document.getElementById("mendNameB");if(nA)nA.textContent=M.equipos[0].nombre;if(nB)nB.textContent=M.equipos[1].nombre;var trA=document.getElementById("mendTeamA"),trB=document.getElementById("mendTeamB");if(trA)trA.className="mend-team a";if(trB)trB.className="mend-team b";if(sc)sc.textContent=M.marcador[0]+" - "+M.marcador[1];if(rs){var a=M.equipos[0].nombre,b=M.equipos[1].nombre;rs.textContent=M.marcador[0]===M.marcador[1]?"Empate":M.marcador[0]>M.marcador[1]?"Gana "+a:"Gana "+b}pintarEstadisticas();etiquetasResultado();if(fe)fe.classList.add("is-open")}},400)}
+// El motor Rogue carga sus propias hojas: no bloquearlo por la precarga del motor antiguo.
+function launchMatch(){var p=$3("matchPick");if(p)p.classList.remove("is-open");var f=$3("matchEnd");if(f)f.classList.remove("is-open");var v=$3("viewMatch");if(v){v.classList.add("is-open");v.setAttribute("aria-hidden","false")}etiquetasResultado();document.body.classList.add("in-match");iniciarRogueMatch(Pick.home,Pick.away);clearInterval(vigia);vigia=setInterval(function(){if(M.fase==="fin"){clearInterval(vigia);vigia=0;try{if(window.Carrera)window.Carrera.guardarFinal149()}catch(e){}var sc=$3("mendScore"),rs=$3("mendRes"),fe=$3("matchEnd");if(typeof Sfx!=="undefined"&&Sfx.musica)Sfx.musica(false);if(typeof Sfx!=="undefined"&&Sfx.final)Sfx.final();if(typeof Sfx!=="undefined"&&Sfx.victoria)Sfx.victoria(true);var onp=document.getElementById("lvOnPitch");if(onp)onp.innerHTML="";lvTecKey=null;var emA=document.getElementById("mendEmA"),emB=document.getElementById("mendEmB");if(emA)emA.src=emblemaEq(0);if(emB)emB.src=emblemaEq(1);var nA=document.getElementById("mendNameA"),nB=document.getElementById("mendNameB");if(nA)nA.textContent=M.equipos[0].nombre;if(nB)nB.textContent=M.equipos[1].nombre;var trA=document.getElementById("mendTeamA"),trB=document.getElementById("mendTeamB");if(trA)trA.className="mend-team a";if(trB)trB.className="mend-team b";if(sc)sc.textContent=M.marcador[0]+" - "+M.marcador[1];if(rs){var a=M.equipos[0].nombre,b=M.equipos[1].nombre;rs.textContent=M.marcador[0]===M.marcador[1]?"Empate":M.marcador[0]>M.marcador[1]?"Gana "+a:"Gana "+b}pintarEstadisticas();etiquetasResultado();if(fe)fe.classList.add("is-open")}},400)}
 function pintarEstadisticasRogue(){
   var caja=document.querySelector('#matchEnd .mend-card');if(!caja)return;
   var t=document.getElementById('mendStats');

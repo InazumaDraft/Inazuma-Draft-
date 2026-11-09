@@ -543,11 +543,27 @@ function rogueNotify(type, payload = {}) {
 const DRAFT_GENERIC_SPRITE = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" shape-rendering=\"crispEdges\"><path fill=\"#30394d\" d=\"M19 3h10v3h4v8h-3v4H18v-3h-3V7h4z\"/><path fill=\"#f0bd8a\" d=\"M20 8h9v7h-9zM21 16h7v4h-7z\"/><path fill=\"#c7a94b\" d=\"M19 10h2v2h-2z\"/><path fill=\"#667b96\" d=\"M17 20h15v12h4v5H13v-5h4z\"/><path fill=\"#e4e7e2\" d=\"M22 20h5v3h-5zM18 32h13v5h-5v-3h-4v3h-4z\"/><path fill=\"#33445f\" d=\"M19 37h4v6h-4zM27 37h4v6h-4z\"/><path fill=\"#d7dce1\" d=\"M19 41h4v3h-4zM27 41h4v3h-4z\"/><path fill=\"#243146\" d=\"M17 44h7v3h-8zM26 44h8v3h-8z\"/></svg>");
 const Sprites = (() => {
   const cache = {};
+  // Evita que una petición de imagen bloqueada deje el partido cargando para siempre.
+  // En Draft se reintenta la hoja real; nunca se suplanta al jugador por un muñeco genérico.
   const img = file => cache[file] || (cache[file] = new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = () => { delete cache[file]; rej(new Error('No se pudo cargar ' + file)); };
-    i.src = 'sprites/' + file + (file.includes('?') ? '' : '?v=4');   // ?v=3: hojas actualizadas (Inazuma 2)
+    let intento = 0;
+    function cargar() {
+      const i = new Image(); let terminado = false;
+      const tiempo = ROGUE_EMBED ? (intento === 0 ? 8000 : 12000) : 30000;
+      const timer = setTimeout(() => terminar(false), tiempo);
+      function terminar(ok) {
+        if (terminado) return; terminado = true; clearTimeout(timer);
+        i.onload = i.onerror = null;
+        if (ok) { res(i); return; }
+        i.removeAttribute('src');
+        if (ROGUE_EMBED && intento++ === 0) { cargar(); return; }
+        delete cache[file]; rej(new Error('No se pudo cargar la hoja ' + file + '. Comprueba la conexión y vuelve a intentarlo.'));
+      }
+      i.onload = () => terminar(true); i.onerror = () => terminar(false);
+      const url = 'sprites/' + file + (file.includes('?') ? '' : '?v=4');
+      i.src = url + (intento ? (url.includes('?') ? '&' : '?') + 'retry=' + Date.now() : '');
+    }
+    cargar();
   }));
   const collFile = pd => 'c' + String(pd.cs[0]).padStart(2, '0') + '.png';
   const refOf = pd => ({ file: collFile(pd), row: pd.cs[1] });
@@ -562,7 +578,10 @@ const Sprites = (() => {
   // Monta una hoja con una fila por jugador del partido
   async function matchSheet(refs) {
     const loadPortrait = src => new Promise(resolve => {
-      const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null); image.src = src;
+      const image = new Image(); let done = false;
+      const timer = setTimeout(() => finish(null), 5000);
+      function finish(result) { if (done) return; done = true; clearTimeout(timer); image.onload = image.onerror = null; if (!result) image.removeAttribute('src'); resolve(result); }
+      image.onload = () => finish(image); image.onerror = () => finish(null); image.src = src;
     });
     const loaded = await Promise.all(refs.map(async r => {
       const fallbackPortrait = async () => {
@@ -572,23 +591,35 @@ const Sprites = (() => {
         return { image: blank, portrait: true };
       };
       if (r.customPortrait) return fallbackPortrait();
-      try { return { image: await img(r.file), portrait: false }; }
-      catch (error) { if (!ROGUE_EMBED) throw error; return fallbackPortrait(); }
+      // Si falla una hoja, avisar y permitir reintentar; no cambiar el jugador.
+      return { image: await img(r.file), portrait: false };
     }));
-    const w = 48 * GAME.frames.length;
+    const frames = GAME.frames.length, rowWidth = 48 * frames;
+    // Una fila de 47 fotogramas mide 2256 px: supera el límite WebGL de
+    // algunos móviles. Reempaquetamos en 32 columnas sin cambiar los índices.
+    const columns = ROGUE_EMBED ? 32 : frames;
     const c = document.createElement('canvas');
-    c.width = w; c.height = refs.length * 48;
+    c.width = columns * 48; c.height = Math.ceil(refs.length * frames / columns) * 48;
     const g = c.getContext('2d');
+    if (!g) throw new Error('El navegador no pudo preparar los jugadores.');
+    const strip = document.createElement('canvas'); strip.width = rowWidth; strip.height = 48;
+    const sg = strip.getContext('2d', { willReadFrequently: true });
+    if (!sg) throw new Error('El navegador no pudo preparar los jugadores.');
     refs.forEach((r, k) => {
-      const item = loaded[k];
+      const item = loaded[k]; sg.clearRect(0, 0, rowWidth, 48);
       if (item.portrait) {
         const scale = Math.min(48 / item.image.width, 48 / item.image.height), dw = item.image.width * scale, dh = item.image.height * scale;
-        const oldSmoothing = g.imageSmoothingEnabled; g.imageSmoothingEnabled = false;
-        for (let x = 0; x < w; x += 48) g.drawImage(item.image, 0, 0, item.image.width, item.image.height, x + (48 - dw) / 2, k * 48 + (48 - dh) / 2, dw, dh);
-        g.imageSmoothingEnabled = oldSmoothing;
+        sg.imageSmoothingEnabled = false;
+        for (let x = 0; x < rowWidth; x += 48) sg.drawImage(item.image, 0, 0, item.image.width, item.image.height, x + (48 - dw) / 2, (48 - dh) / 2, dw, dh);
       } else {
-        g.drawImage(item.image, 0, r.row * 48, w, 48, 0, k * 48, w, 48);
-        if (r.kit) recolor(g, w, k * 48, r.kit);
+        sg.drawImage(item.image, 0, r.row * 48, rowWidth, 48, 0, 0, rowWidth, 48);
+        if (r.kit) recolor(sg, rowWidth, 0, r.kit);
+      }
+      let src = 0, pos = k * frames;
+      while (src < frames) {
+        const col = pos % columns, n = Math.min(frames - src, columns - col);
+        g.drawImage(strip, src * 48, 0, n * 48, 48, col * 48, Math.floor(pos / columns) * 48, n * 48, 48);
+        src += n; pos += n;
       }
     });
     return c;
