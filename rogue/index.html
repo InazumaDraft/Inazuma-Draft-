@@ -663,7 +663,10 @@ const Sprites = (() => {
       m.set((s[0] << 16) | (s[1] << 8) | s[2], o);
     });
     if (kit.keeper) { put(GK_A, A, lum([255,139,32])); put(GK_B, B, lum([57,123,156])); }
-    else { put(KIT_A, A, lum(KIT_A[0])); put(KIT_B, B, lum([57, 131, 197])); }
+    else if (kit.nativeColors) {
+      const native = kit.nativeColors;
+      put(native.a, A, lum(native.a[0])); put(native.b, B, lum(native.b[0]));
+    } else { put(KIT_A, A, lum(KIT_A[0])); put(KIT_B, B, lum([57, 131, 197])); }
     return m;
   }
   function recolor(g, w, y0, kit) {
@@ -3780,9 +3783,25 @@ class MatchScene extends Phaser.Scene {
     for (const t of Object.values(this.trails)) t.stop();
     this.tfx.reset();
     const F = Logic.FIELD, m = F.margin * PX;
-    this.cameras.main.setFollowOffset(0, s.settings.spectator ? 0 : 60);
-    this.cameras.main.setZoom(s.settings.spectator ? 0.82 : 1);
-    this.cameras.main.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
+    const cam = this.cameras.main;
+    cam.setFollowOffset(0, s.settings.spectator ? 0 : 60);
+    cam.setZoom(s.settings.spectator ? 0.82 : 1);
+    cam.setBounds(-m, -m - 40, F.w * PX + 2 * m, F.l * PX + 2 * m + 80);
+    if (ROGUE_EMBED && s.settings.draftClock) {
+      // Campo completo en móvil: el tamaño depende de la pantalla, no del zoom del motor 5v5.
+      cam.stopFollow(); this.draftCameraSize169 = '';
+      this.fitDraftPitch169();
+    } else cam.startFollow(this.camT, true, 1, 1);
+  }
+
+  fitDraftPitch169() {
+    const cam = this.cameras.main, F = Logic.FIELD;
+    const key = cam.width + ':' + cam.height;
+    if (key === this.draftCameraSize169) return;
+    this.draftCameraSize169 = key;
+    // Reserva espacio para el marcador superior y controles inferiores.
+    const zoom = Math.min(cam.width / (F.w * PX + 100), Math.max(40, cam.height - 130) / (F.l * PX + 100));
+    cam.removeBounds(); cam.setZoom(zoom); cam.centerOn(F.w * PX / 2, F.l * PX / 2);
   }
 
   fxRing(x, y, color, scale, depth, width = 4) {
@@ -3864,6 +3883,7 @@ class MatchScene extends Phaser.Scene {
     }
 
     this.tfx.update(s, time, delta);
+    if (ROGUE_EMBED && s.settings.draftClock) this.fitDraftPitch169();
     const spectator = !!s.settings.spectator, me = Logic.controlled(s), bl = s.ball;
     const foc = spectator ? { x: bl.x * PX, y: bl.y * PX, z: 1 } : this.tfx.focus(s, me);
     let tx = foc.x, ty = foc.y;
@@ -6544,19 +6564,73 @@ const App = (() => {
     marytimes:['#398ba4','#294a6a'], fauxshore:['#735239','#c5bdac'], claustrosagrado:['#bd9c6a','#6a7339'],
     royalredux:['#526a4a','#6a5239']
   });
+  // Colores de los clubes Draft. Las segundas son alternativas diseñadas para evitar confusión;
+  // las primeras siguen la apariencia conocida del club dentro de los límites del sprite Rogue.
+  const DRAFT_KITS_169 = Object.freeze({
+    raimon:[['#efd039','#2263a4'],['#ece9cf','#237876']],
+    imperial:[['#456149','#9a7453'],['#e4e0c8','#416d58']],
+    occult:[['#665e83','#b1bbc0'],['#d4cddd','#756e98']],
+    wild:[['#538e6b','#343b3a'],['#dbdbcf','#48866c']],
+    shuriken:[['#6b4d7e','#514868'],['#dcdccc','#969e98']],
+    kirkwood:[['#e4ddc7','#a9323a'],['#223348','#eee9df']],
+    zeus:[['#f1f0e9','#929dcc'],['#292b2d','#ba3a40']],
+    otaku:[['#294655','#8c3435'],['#ece9dc','#aa3d48']],
+    farm:[['#9aa739','#5c6c34'],['#d6c796','#597442']],
+    brain:[['#dcd5c4','#778271'],['#223348','#eee9df']],
+    umbrella:[['#71a0b7','#c4bba0'],['#deded0','#273b48']],
+    ogro:[['#a92239','#493268'],['#e6e4d9','#af2f4a']],
+    angeloscuro:[['#e56d2f','#38804c'],['#292e46','#f4e9ca']],
+    geminis:[['#656c7b','#5b6172'],['#e4aa4a','#4d9cae']],
+    epsilon:[['#ba293b','#363d56'],['#92c4cc','#36404e']],
+    genesis:[['#f0efeb','#494c59'],['#223348','#a62e44']],
+    caos:[['#c82e36','#273e51'],['#e4e5df','#477b91']],
+    alpino:[['#f6f6ed','#364c83'],['#344884','#e6e7de']],
+    marytimes:[['#34a58d','#deded5'],['#e2c932','#30546a']],
+    fauxshore:[['#78c1cb','#244a75'],['#eee2bf','#dcb648']],
+    claustrosagrado:[['#df862f','#a63d2b'],['#e8ddc4','#674631']],
+    royalredux:[['#345b42','#503621'],['#e4e0c8','#7f3035']]
+  });
+  // Paletas de las pocas filas nativas que no existen en la colección.
+  // Se limitan a colores del uniforme y a la mitad inferior del fotograma.
+  const DRAFT_NATIVE_COLORS_169 = {
+    'Tormenta de Géminis':{a:[[213,213,205],[131,131,123]],b:[[123,131,123],[205,205,197],[49,82,98]]},
+    'Alpino':{a:[[246,246,230],[205,189,148]],b:[[74,57,139],[106,90,180],[123,82,123]]},
+    'Épsilon':{a:[[230,230,230],[172,180,189]],b:[[222,57,156],[246,123,164]]},
+    'Claustro Sagrado':{a:[[164,156,115],[123,123,90]],b:[[57,65,49],[82,90,65],[98,74,32],[139,98,32]]},
+    'Fauxshore':{a:[[246,205,32],[164,131,16]],b:[[65,65,65],[98,98,98]]},
+    'Royal Academy Redux':{a:[[205,24,24],[148,16,16]],b:[[57,57,57],[74,82,74],[115,82,57],[172,131,106]]},
+    'Génesis':{a:[[213,213,197],[148,148,139]],b:[[57,65,90],[74,90,131],[90,82,65],[123,115,106]]},
+    'Caos':{a:[[246,106,0],[172,74,0]],b:[[180,156,139],[65,74,65],[98,98,106],[230,213,180]]}
+  };
+  function draftKitDistance169(a,b) {
+    const rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+    const x=rgb(a[0]),y=rgb(b[0]);
+    const light=v=>0.299*v[0]+0.587*v[1]+0.114*v[2];
+    return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2])*0.65 + Math.abs(light(x)-light(y))*0.8;
+  }
+  function draftMatchKits169(a,b,mySide) {
+    const A=DRAFT_KITS_169[String(a.id||'').toLowerCase()], B=DRAFT_KITS_169[String(b.id||'').toLowerCase()];
+    if(!A||!B)return [A&&A[0],B&&B[0]];
+    if(draftKitDistance169(A[0],B[0])>=100)return [A[0],B[0]];
+    // A es el equipo del usuario, no siempre el local: conserva primero el kit local.
+    const pairs=mySide===1?[[1,0],[0,1],[1,1],[0,0]]:[[0,1],[1,0],[1,1],[0,0]];
+    let best=pairs[0],score=-1;
+    for(const pair of pairs){const d=draftKitDistance169(A[pair[0]],B[pair[1]]);if(d>score){best=pair;score=d}if(d>=120){best=pair;break}}
+    return [A[best[0]],B[best[1]]];
+  }
   const DRAFT_GK_FALLBACK_165 = [ ['#9c3973','#4a395a'], ['#397b83','#294a6a'], ['#737339','#4a5231'], ['#8b5a39','#524a73'] ];
   function draftKeeperKit(id) {
     let kit = DRAFT_GK_KITS_165[id];
     if (!kit) { let n = 0; for (const ch of String(id)) n = (n * 31 + ch.charCodeAt(0)) >>> 0; kit = DRAFT_GK_FALLBACK_165[n % DRAFT_GK_FALLBACK_165.length]; }
     return { a:kit[0], b:kit[1], keeper:true };
   }
-  function buildDraftRogueTeam(team, side, sharedAssets) {
+  function buildDraftRogueTeam(team, side, sharedAssets, chosenKit169) {
     const chosen = draftPickEleven(team);
     const roles = chosen.map(x => x.role);
     const positions = layout(roles);
     const rogueTeam = TEAM(draftTeamKey(team, side));
     const draftId = String(team.id || '').toLowerCase();
-    const nativeKit = draftId === 'raimon' ? null : (rogueTeam && (rogueTeam.kit || DRAFT_ROGUE_KITS[rogueTeam.key])) || null;
+    const nativeKit = chosenKit169 ? {a:chosenKit169[0],b:chosenKit169[1]} : (draftId === 'raimon' ? null : (rogueTeam && (rogueTeam.kit || DRAFT_ROGUE_KITS[rogueTeam.key])) || null);
     const usedAssets = sharedAssets || { ids: new Set(), refs: new Set() };
     const nativeMembers = draftId === 'raimon' ? new Map() : new Map((rogueTeam && rogueTeam.players || []).map(m => [Number(m.id), m]));
     const onceDebug = [];
@@ -6590,6 +6664,9 @@ const App = (() => {
       // El portero nativo del rival solo se usa cuando el jugador NO tiene identidad propia.
       let teamKeeper = !mapped && draftId !== 'raimon' && role === 'POR' && rogueTeam ? rogueTeam.players.find(m => m.role === 'POR') : null;
       let teamSprite = native && native.file ? native : teamKeeper && teamKeeper.file ? teamKeeper : null;
+      // Colección mantiene la identidad y permite vestir todos los fichajes de forma uniforme.
+      // Si ese jugador no tiene colección se conserva su fila nativa auténtica.
+      if (chosenKit169 && role !== 'POR' && pd.cs) teamSprite = null;
       if (teamSprite && usedAssets.refs.has(String(teamSprite.file) + ':' + Number(teamSprite.row))) teamSprite = null;
       const sprite = teamSprite
         ? { file: String(teamSprite.file), row: Number(teamSprite.row) || 0 }
@@ -6603,10 +6680,15 @@ const App = (() => {
       usedAssets.refs.add(spriteRefKey);
       // Las filas Rogue nativas conservan su uniforme; los sprites de colección reciben el kit de su equipo.
       const hasNativeKit = !!(rogueTeam && rogueTeam.kit);
-      if (role !== 'POR' && nativeKit && (/^c\d+\.png$/i.test(sprite.file) || (hasNativeKit && /^r\d+\.png$/i.test(sprite.file)))) {
+      if (role !== 'POR' && nativeKit && /^c\d+\.png$/i.test(sprite.file)) {
+        sprite.kit = Object.assign({}, nativeKit, pd.role === 'POR' ? {keeper:true} : {});
+      } else if (role !== 'POR' && chosenKit169 && nativeKit && /^r\d+\.png$/i.test(sprite.file) && rogueTeam && DRAFT_NATIVE_COLORS_169[rogueTeam.key]) {
+        sprite.kit = Object.assign({}, nativeKit, {nativeColors:DRAFT_NATIVE_COLORS_169[rogueTeam.key]});
+      } else if (role !== 'POR' && nativeKit && hasNativeKit && /^r\d+\.png$/i.test(sprite.file)) {
         sprite.kit = Object.assign({}, nativeKit);
-      } else if (role === 'POR' && draftId !== 'raimon' && /^c\d+\.png$/i.test(sprite.file)) {
+      } else if (role === 'POR' && (draftId !== 'raimon' || pd.role !== 'POR') && /^c\d+\.png$/i.test(sprite.file)) {
         sprite.kit = draftKeeperKit(draftId);
+        if (pd.role !== 'POR') delete sprite.kit.keeper;
       }
       // Si faltase una hoja, usar un muñeco entero y vestirlo con los colores de este equipo.
       const fallbackKit = nativeKit || (draftId === 'raimon' ? { a: '#D5B410', b: '#39527B' } : null);
@@ -6668,8 +6750,11 @@ const App = (() => {
       // Desbloquea Web Audio en el arranque del partido sin tocar cfg.music/sfx ni sus volúmenes guardados.
       Sound.unlock();
       const usedAssets = { ids: new Set(), refs: new Set() };
-      const A = buildDraftRogueTeam(payload.teams.A, 0, usedAssets);
-      const B = buildDraftRogueTeam(payload.teams.B, 1, usedAssets);
+      const kits169 = draftMatchKits169(payload.teams.A,payload.teams.B,payload.mySide);
+      const A = buildDraftRogueTeam(payload.teams.A, 0, usedAssets, kits169[0]);
+      const B = buildDraftRogueTeam(payload.teams.B, 1, usedAssets, kits169[1]);
+      if (ROGUE_EMBED) window.__draftKits169 = { A:kits169[0], B:kits169[1] };
+      if (A.players.length !== 11 || B.players.length !== 11) throw new Error('Cada equipo debe tener exactamente 11 jugadores.');
       const rivalKey = draftTeamKey(payload.teams.B, 1);
       await startMatch({ A, B }, !!payload.golden, payload.field || TEAM_FIELD[rivalKey] || 'normal', 'match', null);
       if (!api.match) throw new Error('No se pudieron cargar los sprites del partido.');
