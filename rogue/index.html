@@ -1548,12 +1548,18 @@ const Logic = (() => {
       const h = homeTarget(s, p);
       let tx = h.x + Math.sin(s.t * 0.7 + p.num) * 2, ty = h.y;
       const hd = dist(p, b.owner);
-      // v176: el de banda se abre y sube; el lateral solo se vuelca si el equipo ya ataca
+      // v176/v177: el de banda se abre; el lateral acompaña el ataque a la altura del
+      // balón (recibir de él no es un pase atrás) y el extremo se adelanta un poco más
       if (p.wide) {
-        const dir = attackDir(p.team), prof = depthOf(p.team, b.y);
+        const prof = depthOf(p.team, b.y);
         tx += flankAbs(p) * F.w * 0.06;
-        ty += dir * (p.band === 'lateral' ? (prof > 30 ? 8 : prof > 24 ? 6 : prof > 12 ? 3 : 0.5) : (prof > 24 ? 3 : 1.5));
+        if (p.band === 'lateral') {
+          // Se queda unos metros por detrás del balón: libre para recibir y con el juego por delante
+          const objetivo = clamp(prof - 5, 20, 62);
+          ty = p.team === 'A' ? F.l - objetivo : objetivo;
+        } else ty += attackDir(p.team) * (prof > 24 ? 3 : 1.5);
         tx = clamp(tx, 2, F.w - 2);
+        ty = clamp(ty, 2, F.l - 2);
       }
       if (s.settings.spectator && supportOffer(s, b.owner, p)) {
         const d = hd || 1, ux = (p.x - b.owner.x) / d, uy = (p.y - b.owner.y) / d;
@@ -1565,7 +1571,8 @@ const Logic = (() => {
       }
       if (hd < 5) { tx += (p.x - b.owner.x) / (hd || 1) * 3; ty += (p.y - b.owner.y) / (hd || 1) * 3; }
       ty = onside(s, p, ty);
-      moveTo(s, p, tx, ty, dist(p, { x: tx, y: ty }) > 7);
+      // v177: el de banda aprieta antes para llegar arriba a tiempo
+      moveTo(s, p, tx, ty, dist(p, { x: tx, y: ty }) > (p.wide ? 4 : 7));
       return;
     }
     defendAI(s, p, dt);
@@ -1642,7 +1649,7 @@ const Logic = (() => {
   }
   // Mejor compañero para pasar: libre, con la línea limpia y, si puede ser, más adelantado
   function bestPassTarget(s, p) {
-    let best = null;
+    let best = null, delante = null;
     for (const m of s.players) {
       if (m.team !== p.team || m === p || m.role === 'POR' || m.stun > 0) continue;
       const d = dist(m, p); if (d < 3) continue;
@@ -1652,15 +1659,26 @@ const Logic = (() => {
       // v176: laterales y extremos piden el balón; abrir a la banda y cambiar de lado suma
       let banda = 0;
       if (m.wide) {
-        banda = m.band === 'lateral' ? 3.2 : 2.2;
+        banda = m.band === 'lateral' ? 4.6 : 2.2;
         if (p.wide && m.flank !== p.flank) banda += 1.2;    // cambio de banda
         else if (!p.wide) banda += 0.6;                     // abrir el juego a un compañero abierto
         if (m.band === 'lateral') banda += prog > 6 ? 1.5 : prog > 0 ? 0.7 : 0;  // el lateral se incorpora
       }
       // Circular hacia atrás por banda no es perder terreno: se penaliza menos
-      const progW = m.wide ? prog * 0.12 : prog * 0.3;
+      // v177: avanzar suma más y el pase atrás resta, también en banda
+      const progW = m.band === 'lateral' ? (prog >= 0 ? prog * 0.35 : prog * 0.14)
+        : m.wide ? (prog >= 0 ? prog * 0.35 : prog * 0.4)
+        : (prog >= 0 ? prog * 0.4 : prog * 1.05);
       const sc = Math.min(open, 7) + progW + banda - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
-      if (!best || sc > best.score) best = { p: m, score: sc, open };
+      const cand = { p: m, score: sc, open, prog };
+      if (!best || sc > best.score) best = cand;
+      if (prog >= 0 && (!delante || sc > delante.score)) delante = cand;   // v177: mejor opción hacia delante
+    }
+    // v177: con una alternativa decente hacia delante, no se devuelve el balón.
+    // En banda se exige más: abrir al lateral es circular, no esconder el balón.
+    if (best && delante && best.prog < -3 && delante.open > 2.2) {
+      const margen = best.p.wide ? 1.2 : 2.6;
+      if (delante.score > best.score - margen) return delante;
     }
     return best;
   }
@@ -1696,7 +1714,7 @@ const Logic = (() => {
         aimGoal(); p.windup = { t: d < 6.5 ? 0.22 : 0.38 + rnd() * 0.2, c: 0.3 + rnd() * 0.2, aimX }; return;
       }
       if (!s.tech && dribT && nd < 2.4 && rnd() < s.diff.techUse) { startTech(s, p, dribT, 0); return; }
-      if (s.settings.spectator && nd < 3.1 && (p.dribbleCd || 0) <= 0 && rnd() < 0.22) {
+      if (s.settings.spectator && nd < 3.1 && (p.dribbleCd || 0) <= 0 && rnd() < (p.wide ? 0.3 : 0.22)) {
         const dir = Math.atan2(goalY - p.y, cx - p.x);
         dribble(s, p, { x: Math.cos(dir), y: Math.sin(dir) }); return;
       }
@@ -1705,13 +1723,16 @@ const Logic = (() => {
       const bandaLibre = m && m.p.wide && m.open > 4.5;
       if (m && m.score > 0 && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || (bandaLibre && rnd() < 0.3 * smart) || rnd() < 0.04)) {
         const ahead2 = depthOf(p.team, m.p.y) > depthOf(p.team, p.y) + 3;
-        pass(s, p, ahead2 && m.open > 3 && rnd() < 0.5 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }, 0, s.settings.spectator ? m.p.id : null); return;
+        pass(s, p, ahead2 && m.open > 3 && rnd() < 0.65 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }, 0, s.settings.spectator ? m.p.id : null); return;
       }
     }
     // Conducción: hacia la portería buscando el hueco más libre y lejos de la banda
     const base = Math.atan2(goalY - p.y, cx - p.x);
     let bestA = base, bs = -Infinity;
-    for (const off of [0, -0.45, 0.45, -0.9, 0.9]) {
+    // v177: el de banda también valora subir por su carril, no solo ir hacia la portería
+    const offsets = [0, -0.45, 0.45, -0.9, 0.9];
+    if (p.wide) offsets.push(Math.atan2(attackDir(p.team) * 7, flankAbs(p) * 2.5) - base);
+    for (const off of offsets) {
       const a = base + off, px = p.x + Math.cos(a) * 3, py = p.y + Math.sin(a) * 3;
       let free = 9; for (const o of opp) free = Math.min(free, Math.hypot(o.x - px, o.y - py));
       const edge = Math.min(px, F.w - px), pen = edge < 2.5 ? (2.5 - edge) * 3 : 0;
@@ -6573,6 +6594,32 @@ const App = (() => {
     if (out.length !== 11) throw new Error('No se pudo completar el once de ' + (team.name || '') + '.');
     return out;
   }
+  // v177: un traspaso no puede cambiarle la cara a un jugador. Si ya no está en la
+  // plantilla Rogue de su club actual, se recupera su sprite auténtico de cualquier
+  // plantilla oficial (se prefiere la que indica su clave de cara, p. ej. ie2_alpino_21507).
+  const DRAFT_REF_CACHE_177 = new Map();
+  function draftNativeRef177(id, face) {
+    const key = Number(id);
+    if (DRAFT_REF_CACHE_177.has(key)) return DRAFT_REF_CACHE_177.get(key);
+    let wanted = '';
+    const f = String(face || '');
+    const parts = f.split('_');
+    if (parts.length >= 3) wanted = parts[parts.length - 2].toLowerCase();
+    let ref = null, first = null;
+    for (const t of GAME.teams) {
+      const members = t && t.players || [];
+      for (const m of members) {
+        if (Number(m.id) !== key || !m.file) continue;
+        const cand = { file: String(m.file), row: Number(m.row) || 0 };
+        if (wanted && String(t.key || '').toLowerCase() === wanted) { ref = cand; break; }
+        if (!first) first = cand;
+      }
+      if (ref) break;
+    }
+    const out = ref || first;
+    DRAFT_REF_CACHE_177.set(key, out);
+    return out;
+  }
   function draftTemplatePlayer(role, used, draftId) {
     const pool = GAME.players.filter(p => p.cs);
     const available = p => {
@@ -6683,7 +6730,7 @@ const App = (() => {
       if (mapped) {
         // La hoja de colección (cs) manda; si el jugador solo existe en la plantilla
         // Rogue, se acepta su referencia auténtica file,row.
-        const nativo = nativeMembers.get(Number(pd.id));
+        const nativo = nativeMembers.get(Number(pd.id)) || draftNativeRef177(Number(pd.id), record.face);
         refBase = pd.cs ? Sprites.refOf(pd)
           : (nativo && nativo.file ? { file: String(nativo.file), row: Number(nativo.row) || 0 } : null);
         if (!refBase) mapped = false;
