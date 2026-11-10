@@ -937,6 +937,31 @@ const Logic = (() => {
   const BASE = { POR: [0, 1.2], DEF: [-4, 11], MED: [6, 19], DEL: [-2, 27] };
   const KO = { POR: [0, 1.2], DEF: [-5, 9], MED: [6, 15] };
 
+  /* ---------- Bandas (v176) ----------
+     Laterales y extremos: los jugadores más abiertos de cada línea (con tres o más
+     en la línea) se marcan para que reciban más balones y se sumen al ataque,
+     pero siguen defendiendo: son los primeros en salir a robar por su banda. */
+  const flankAbs = p => (p.flank || 0) * (p.team === 'A' ? 1 : -1);
+  const sideOf = x => Math.abs(x - cx) < 0.01 ? 0 : (x < cx ? -1 : 1);
+  const onFlank = (p, x) => !!p.wide && Math.abs(x - cx) > F.w * 0.2 && sideOf(x) === flankAbs(p);
+  function markFlanks(s) {
+    for (const p of s.players) { p.flank = 0; p.wide = false; p.band = null; }
+    for (const team of ['A', 'B']) {
+      const lines = {};
+      for (const p of s.players) if (p.team === team && p.role !== 'POR') (lines[p.role] = lines[p.role] || []).push(p);
+      for (const role of ['DEF', 'MED', 'DEL']) {
+        const line = (lines[role] || []).slice().sort((a, b) => (a.home ? a.home[0] : 0) - (b.home ? b.home[0] : 0));
+        if (line.length < 3) continue;
+        for (const p of [line[0], line[line.length - 1]]) {
+          const hx = p.home ? p.home[0] : 0;
+          if (Math.abs(hx) < 15) continue;
+          p.flank = hx < 0 ? -1 : 1; p.wide = true;
+          p.band = role === 'DEF' ? 'lateral' : 'extremo';
+        }
+      }
+    }
+  }
+
   /* ---------- Creación ---------- */
   function createMatch(settings, teams) {
     const isEleven = teams && ((teams.A && teams.A.players && teams.A.players.length >= 11) || (teams.B && teams.B.players && teams.B.players.length >= 11));
@@ -958,6 +983,7 @@ const Logic = (() => {
           dash: null, think: 0, holdT: 0, react: 0, diving: false, gkTech: null, invuln: 0 }));
       });
     }
+    markFlanks(s);
     // Recarga: unas 3 veces por partido; las técnicas fuertes tardan más
     const span = settings.minutes * 60 * GAME_SPEED / 3;
     for (const p of s.players) {
@@ -1435,7 +1461,9 @@ const Logic = (() => {
     let best = null, bd = Infinity;
     for (const p of s.players) {
       if (p.team !== team || p.role === 'POR' || p.stun > 0) continue;
-      const d = dist(p, s.ball); if (d < bd) { bd = d; best = p; }
+      const d = dist(p, s.ball);
+      const eff = onFlank(p, s.ball.x) ? d * 0.8 : d;   // v176: su banda es suya
+      if (eff < bd) { bd = eff; best = p; }
     }
     return best;
   }
@@ -1457,7 +1485,7 @@ const Logic = (() => {
       if (m.team !== p.team || m === p || m.role === 'POR' || dist(m, p) < 3) continue;
       let open = 99;
       for (const o of s.players) if (o.team !== p.team) open = Math.min(open, dist(o, m));
-      const sc = Math.min(open, 8) + (depthOf(p.team, m.y) - depthOf(p.team, p.y)) * 0.25;
+      const sc = Math.min(open, 8) + (depthOf(p.team, m.y) - depthOf(p.team, p.y)) * 0.25 + (m.wide ? 1.3 : 0);
       if (sc > bs) { bs = sc; best = m; }
     }
     return best;
@@ -1492,7 +1520,8 @@ const Logic = (() => {
       if (open < 2.8 || blocked > 0) continue;
       const progress = depthOf(p.team, m.y) - depthOf(p.team, p.y);
       const roleBonus = m.role === 'DEF' ? 1.8 : m.role === 'MED' ? 0.6 : 0;
-      const score = Math.min(open, 12) * 1.35 - Math.max(0, d - 9) * 0.42 + clamp(progress, -8, 12) * 0.12 + roleBonus;
+      const bandBonus = m.wide ? 1.6 : 0;   // v176: salida por banda
+      const score = Math.min(open, 12) * 1.35 - Math.max(0, d - 9) * 0.42 + clamp(progress, -8, 12) * 0.12 + roleBonus + bandBonus;
       if (score > bestScore) { bestScore = score; best = m; }
     }
     return best;
@@ -1519,6 +1548,13 @@ const Logic = (() => {
       const h = homeTarget(s, p);
       let tx = h.x + Math.sin(s.t * 0.7 + p.num) * 2, ty = h.y;
       const hd = dist(p, b.owner);
+      // v176: el de banda se abre y sube; el lateral solo se vuelca si el equipo ya ataca
+      if (p.wide) {
+        const dir = attackDir(p.team), prof = depthOf(p.team, b.y);
+        tx += flankAbs(p) * F.w * 0.06;
+        ty += dir * (p.band === 'lateral' ? (prof > 30 ? 8 : prof > 24 ? 6 : prof > 12 ? 3 : 0.5) : (prof > 24 ? 3 : 1.5));
+        tx = clamp(tx, 2, F.w - 2);
+      }
       if (s.settings.spectator && supportOffer(s, b.owner, p)) {
         const d = hd || 1, ux = (p.x - b.owner.x) / d, uy = (p.y - b.owner.y) / d;
         const side = (p.num || 0) % 2 === 0 ? 1 : -1;
@@ -1547,7 +1583,9 @@ const Logic = (() => {
     let presser = null, nearest = Infinity;
     for (const q of s.players) {
       if (q.team !== p.team || q.role === 'POR' || q.stun > 0 || (!s.settings.spectator && q.id === s.controlledId)) continue;
-      const d = dist(q, h); if (d < nearest) { nearest = d; presser = q; }
+      const d = dist(q, h);
+      const eff = onFlank(q, h.x) ? d * 0.7 : d;   // v176: si atacan por su banda, sale él
+      if (eff < nearest) { nearest = eff; presser = q; }
     }
     if (presser === p) {
       // Presión: va a donde estará el rival (no a donde está), siempre por el lado de su portería
@@ -1559,7 +1597,8 @@ const Logic = (() => {
         const t = bestTech(p, 'bloqueo');
         if (t && !s.tech && d < 3 && rnd() < use * dt * 1.5) { startTech(s, p, t, 0); return; }
         const tk = (p.team === 'B' || s.settings.spectator) ? s.diff.tackle : 0.6;
-        if (d < 2.2 && p.tackleCd <= 0 && rnd() < tk * dt * 2.5) { p.windup = (p.team === 'B' || s.settings.spectator) ? 0.18 : 0.22; }
+        const reach = p.wide ? 2.6 : 2.2;   // v176: en banda se va arriba antes
+        if (d < reach && p.tackleCd <= 0 && rnd() < tk * dt * 2.5) { p.windup = (p.team === 'B' || s.settings.spectator) ? 0.18 : 0.22; }
       }
       return;
     }
@@ -1609,8 +1648,18 @@ const Logic = (() => {
       const d = dist(m, p); if (d < 3) continue;
       let open = 9; for (const o of s.players) if (o.team !== p.team) open = Math.min(open, dist(o, m));
       const prog = depthOf(p.team, m.y) - depthOf(p.team, p.y);
-      const distancePenalty = s.settings.spectator ? Math.max(0, d - 12) * 0.38 : d > 18 ? 2 : 0;
-      const sc = Math.min(open, 7) + prog * 0.3 - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
+      const distancePenalty = s.settings.spectator ? Math.max(0, d - 12) * (m.wide ? 0.26 : 0.38) : (d > 18 ? 2 : 0);
+      // v176: laterales y extremos piden el balón; abrir a la banda y cambiar de lado suma
+      let banda = 0;
+      if (m.wide) {
+        banda = m.band === 'lateral' ? 3.2 : 2.2;
+        if (p.wide && m.flank !== p.flank) banda += 1.2;    // cambio de banda
+        else if (!p.wide) banda += 0.6;                     // abrir el juego a un compañero abierto
+        if (m.band === 'lateral') banda += prog > 6 ? 1.5 : prog > 0 ? 0.7 : 0;  // el lateral se incorpora
+      }
+      // Circular hacia atrás por banda no es perder terreno: se penaliza menos
+      const progW = m.wide ? prog * 0.12 : prog * 0.3;
+      const sc = Math.min(open, 7) + progW + banda - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
       if (!best || sc > best.score) best = { p: m, score: sc, open };
     }
     return best;
@@ -1652,7 +1701,9 @@ const Logic = (() => {
         dribble(s, p, { x: Math.cos(dir), y: Math.sin(dir) }); return;
       }
       const m = bestPassTarget(s, p), mine = Math.min(nd, 7);
-      if (m && m.score > 0 && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || rnd() < 0.04)) {
+      // v176: con un compañero de banda libre, se le busca antes (aunque no sea el pase perfecto)
+      const bandaLibre = m && m.p.wide && m.open > 4.5;
+      if (m && m.score > 0 && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || (bandaLibre && rnd() < 0.3 * smart) || rnd() < 0.04)) {
         const ahead2 = depthOf(p.team, m.p.y) > depthOf(p.team, p.y) + 3;
         pass(s, p, ahead2 && m.open > 3 && rnd() < 0.5 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }, 0, s.settings.spectator ? m.p.id : null); return;
       }
