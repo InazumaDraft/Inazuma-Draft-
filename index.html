@@ -2250,7 +2250,7 @@ var Online179=(function(){
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, chunks={}, mundoListo=false, reintentarVisible=false, salaLista=false;
+  var transporteForzado=null, chunks={}, trozos179=null, tMundo=null, mundoOk179=false, mundoListo=false, reintentarVisible=false, salaLista=false, invitado179=null, selector179=null, selectorAbierto179=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2287,15 +2287,22 @@ var Online179=(function(){
     var t;try{t=JSON.stringify(o)}catch(e){return}
     if(t.length<=TAM){emandar(t);return}
     var id=++seq,n=Math.ceil(t.length/TAM);
-    for(var i=0;i<n;i++)emandar(JSON.stringify({__c:1,id:id,n:i,total:n,txt:t.substr(i*TAM,TAM)}));
+    var partes=[];
+    for(var i=0;i<n;i++)partes.push(t.substr(i*TAM,TAM));
+    trozos179={id:id,total:n,partes:partes};   // por si hay que reenviarlos
+    for(var i=0;i<n;i++){
+      // de golpe el servidor público los tira: salen uno a uno y despacio
+      mandarTrozo(id,i,n,partes[i],i*40);
+    }
   }
   function alLlegar(txt){
     var o=null;try{o=JSON.parse(txt)}catch(e){return}
     if(!o||typeof o!=="object")return;
     if(o.__c){
-      var b=chunks[o.id]||(chunks[o.id]={partes:[],total:o.total});
+      var b=chunks[o.id]||(chunks[o.id]={partes:[],total:o.total,pedidos:0});
       b.partes[o.n]=o.txt;
-      for(var i=0;i<b.total;i++)if(b.partes[i]===undefined)return;
+      for(var i=0;i<b.total;i++)if(b.partes[i]===undefined){pedirTrozos(o.id,b);return}
+      if(b.espera){clearTimeout(b.espera);b.espera=null}
       var junto=b.partes.join("");delete chunks[o.id];
       var m=null;try{m=JSON.parse(junto)}catch(e){return}
       if(m)recibir(m);
@@ -2303,11 +2310,40 @@ var Online179=(function(){
     }
     recibir(o);
   }
+  // los públicos pierden trozos: a los dos segundos se pide lo que falte,
+  // y se sigue pidiendo hasta que el mundo llega entero
+  function pedirTrozos(id,b){
+    if(b.espera)return;
+    b.espera=setTimeout(function(){
+      b.espera=null;
+      var falta=[];
+      for(var i=0;i<b.total;i++)if(b.partes[i]===undefined)falta.push(i);
+      if(!falta.length||++b.pedidos>8)return;
+      try{enviar({t:"pido",id:id,faltan:falta})}catch(e){}
+      pedirTrozos(id,b);
+    },2000);
+  }
+  // manda un trozo; si no es el primero va con un poco de retraso para no
+  // ahogar al servidor público, que es lo que hace que se pierdan
+  function mandarTrozo(id,i,total,txt, retraso){
+    var t=JSON.stringify({__c:1,id:id,n:i,total:total,txt:txt});
+    if(!retraso){emandar(t);return}
+    setTimeout(function(){if(T)emandar(t)},retraso);
+  }
+  // si al de enfrente le falta algún trozo, se lo vuelvo a mandar
+  function servirTrozos(id,faltan){
+    if(!trozos179||trozos179.id!==id)return;
+    var partes=trozos179.partes,total=trozos179.total;
+    (faltan||[]).forEach(function(i,ord){
+      if(partes[i]===undefined)return;
+      mandarTrozo(id,i,total,partes[i],120+ord*40);
+    });
+  }
   function usarTransporte(TT){
     T=TT;
     TT.alMensaje=alLlegar;
     TT.alAbierto=listoCanal;
-    TT.alError=function(m){cambiarEstado("error",m||"Error de conexión")};
+    TT.alError=function(m){reintentarVisible=true;cambiarEstado("error",m||"Error de conexión")};
     if(TT.arrancar)TT.arrancar();
   }
 
@@ -2408,11 +2444,239 @@ var Online179=(function(){
     return api;
   }
 
+  /* ---------------- servidores p\xFAblicos de paso ----------------
+     Para que dos m\xF3viles se encuentren hace falta un sitio donde verse.
+     Estos son brokers MQTT p\xFAblicos y an\xF3nimos: no hay que darse de alta ni
+     montar nada. Se prueban todos a la vez y se usa el primero que responda,
+     as\xED que si uno est\xE1 ca\xEDdo o la compa\xF1\xEDa lo bloquea, tira con otro.
+     Si montas tu propio relay (RELAY179), ese va primero. */
+  var BROKERS179=[
+    {url:"wss://public.cloud.shiftr.io:443",user:"public",pass:"public"},
+    {url:"wss://broker.emqx.io:8084/mqtt"},
+    {url:"wss://broker.hivemq.com:8884/mqtt"},
+    {url:"wss://test.mosquitto.org:8081/mqtt"}
+  ];
+
+  /* ---------------- cliente MQTT m\xEDnimo (3.1.1, QoS 0) ----------------
+     Escrito a mano para no depender de ninguna biblioteca externa. */
+  function MQTT179(hacerWS){
+    var api={}, ws=null, buf=null, pid=1, hb=null, alConnack=null;
+    api.alAbrir=null; api.alMensaje=null; api.alError=null; api.alCerrar=null;
+
+    function bytes(s){
+      var u=unescape(encodeURIComponent(s)), b=[], i;
+      for(i=0;i<u.length;i++)b.push(u.charCodeAt(i)&255);
+      return b;
+    }
+    function cad(s){ var b=bytes(s); return [(b.length>>8)&255, b.length&255].concat(b); }
+    function varint(n){ var b=[]; do{ var d=n%128; n=Math.floor(n/128); if(n>0)d|=128; b.push(d); }while(n>0); return b; }
+    function paquete(tipo,flags,cuerpo){ return [((tipo<<4)|(flags||0))].concat(varint(cuerpo.length),cuerpo); }
+    function mandar(b){
+      if(!ws||ws.readyState!==1)return false;
+      try{ ws.send(new Uint8Array(b)); return true; }catch(e){ return false; }
+    }
+    function utf8(b){
+      var s="", i;
+      for(i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);
+      try{ return decodeURIComponent(escape(s)); }catch(e){ return s; }
+    }
+
+    function tratar(b0,cuerpo){
+      var tipo=b0>>4;
+      if(tipo===2){
+        // CONNACK: cuerpo[1] es el c\xF3digo de vuelta, 0 es que entra
+        if(alConnack)alConnack(cuerpo.length>=2?cuerpo[1]:-1);
+        return;
+      }
+      if(tipo===3){
+        var n=(cuerpo[0]<<8)|cuerpo[1], tema=utf8(cuerpo.subarray(2,2+n));
+        var qos=(b0>>1)&3, off=2+n;
+        if(qos>0)off+=2;
+        var carga=utf8(cuerpo.subarray(off));
+        if(api.alMensaje)api.alMensaje(tema,carga);
+        return;
+      }
+      if(tipo===13)return;                      // PINGRESP
+    }
+
+    function recibir(datos){
+      var d=new Uint8Array(datos), tmp, p=0;
+      if(buf&&buf.length){ tmp=new Uint8Array(buf.length+d.length); tmp.set(buf,0); tmp.set(d,buf.length); }
+      else tmp=d;
+      while(p+2<=tmp.length){
+        var q=p+1, mult=1, rem=0, ok=false, b;
+        while(q<tmp.length){
+          b=tmp[q++]; rem+=(b&127)*mult;
+          if((b&128)===0){ ok=true; break; }
+          mult*=128;
+          if(mult>2097152)break;
+        }
+        if(!ok||q+rem>tmp.length)break;
+        tratar(tmp[p], tmp.subarray(q,q+rem));
+        p=q+rem;
+      }
+      buf = p<tmp.length ? tmp.subarray(p) : null;
+    }
+
+    api.conectar=function(url,user,pass,cliente,ms){
+      var fin=false, timer=null;
+      function limpiar(){ if(timer){ clearTimeout(timer); timer=null; } }
+      function fallo(m){
+        if(fin)return; fin=true; limpiar();
+        try{ if(ws)ws.close(); }catch(e){}
+        if(api.alError)api.alError(m||"error");
+      }
+      function exito(){
+        if(fin)return; fin=true; limpiar();
+        hb=setInterval(function(){ mandar([0xC0,0x00]); },30000);
+        if(api.alAbrir)api.alAbrir();
+      }
+      alConnack=function(rc){ if(rc===0)exito(); else fallo("rechazado ("+rc+")"); };
+      // hay brokers que exigen el subprotocolo mqtt en el handshake
+      try{ ws=(hacerWS||function(u){return new WebSocket(u,"mqtt")})(url); }catch(e){ return fallo("sin ws"); }
+      ws.binaryType="arraybuffer";
+      if(ms)timer=setTimeout(function(){ fallo("timeout"); }, ms);
+      ws.onopen=function(){
+        var vh=[0,4,77,81,84,84,4,(user?128:0)|(pass?64:0)|2,0,60];
+        var pl=cad(cliente||("c"+Math.random().toString(36).slice(2,10)));
+        if(user)pl=pl.concat(cad(user));
+        if(pass)pl=pl.concat(bytes(pass));
+        mandar(paquete(1,0,vh.concat(pl)));
+      };
+      ws.onmessage=function(e){
+        var d=e.data;
+        if(typeof d==="string"){ var a=new Uint8Array(d.length); for(var i=0;i<d.length;i++)a[i]=d.charCodeAt(i)&255; d=a; }
+        else if(d instanceof ArrayBuffer) d=new Uint8Array(d);
+        else if(d&&d.buffer) d=new Uint8Array(d.buffer,d.byteOffset,d.byteLength);
+        if(d)recibir(d);
+      };
+      ws.onerror=function(){ fallo("error de red"); };
+      ws.onclose=function(){
+        if(hb)clearInterval(hb); hb=null;
+        if(!fin){ fin=true; limpiar(); if(api.alError)api.alError("cerrado"); }
+        else if(api.alCerrar)api.alCerrar();
+      };
+      return api;
+    };
+    api.suscribir=function(tema){
+      var p=pid++; if(pid>65000)pid=1;
+      return mandar(paquete(8,2,[ (p>>8)&255, p&255 ].concat(cad(tema),[0])));
+    };
+    api.publicar=function(tema,txt){ return mandar(paquete(3,0, cad(tema).concat(bytes(txt))) ); };
+    api.cerrar=function(){
+      if(hb)clearInterval(hb); hb=null;
+      try{ mandar([0xE0,0x00]); }catch(e){}
+      try{ if(ws)ws.close(); }catch(e){}
+      ws=null; buf=null;
+    };
+    return api;
+  }
+
+  /* ---------------- transporte por servidor p\xFAblico ---------------- */
+  function TMqtt(esHost){
+    var api={};
+    var conex=[], yo="c"+Math.random().toString(36).slice(2,10), donde179=null;
+    var tema=null, cerrado=false, vistos={}, orden=[], n=0;
+    var tBus=null, vecesBus=0, respondido=false;
+    TAM=6000;                                  // los p\xFAblicos no admiten mensajes muy grandes
+
+    function visto(id){
+      if(vistos[id])return true;
+      vistos[id]=1; orden.push(id);
+      if(orden.length>300)delete vistos[orden.shift()];
+      return false;
+    }
+    api.enviar=function(txt){
+      var s;
+      try{ s=JSON.stringify({de:yo,n:++n,txt:txt}); }catch(e){ return; }
+      // mientras no sepamos por cu\xE1l nos llega el otro, se manda por todos;
+      // en cuanto se sabe, solo por ese. Si no, cada partida ser\xEDa cuatro
+      // veces m\xE1s datos por la red del m\xF3vil.
+      if(donde179&&donde179.abierto&&donde179.m){ donde179.m.publicar(tema,s); return; }
+      conex.forEach(function(c){ if(c.abierto&&c.m) c.m.publicar(tema,s); });
+    };
+    api.cerrar=function(){
+      cerrado=true;
+      if(tBus)clearInterval(tBus); tBus=null;
+      conex.forEach(function(c){ try{ if(c.m)c.m.cerrar(); }catch(e){} });
+      conex=[]; TAM=24000;
+    };
+
+    function alLlegarMqtt(texto,cual){
+      if(cerrado)return;
+      if(cual)donde179=cual;
+      var o=null;
+      try{ o=JSON.parse(texto); }catch(e){ return; }
+      if(!o||!o.de||o.de===yo)return;
+      var id=o.de+":"+(o.n||0);
+      if(visto(id))return;
+      var dentro=null;
+      try{ dentro=JSON.parse(o.txt); }catch(e){ return; }
+      if(!dentro)return;
+
+      // apret\xF3n de manos: el invitado pregunta y el anfitri\xF3n contesta
+      if(dentro.t==="busco"){
+        if(!esHost)return;
+        if(invitado179&&invitado179!==o.de)return;
+        invitado179=o.de;
+        api.enviar(JSON.stringify({t:"aqui"}));
+        if(estado!=="listo")listoCanal();
+        return;
+      }
+      if(dentro.t==="aqui"){
+        if(esHost)return;
+        if(tBus){ clearInterval(tBus); tBus=null; }
+        if(estado!=="listo")listoCanal();
+        return;
+      }
+      alLlegar(o.txt);
+    }
+
+    function AlAbrirUna(c){
+      if(cerrado)return;
+      c.m.suscribir(tema);
+      if(esHost){
+        if(!salaLista){
+          salaLista=true;
+          if(!rival)cambiarEstado("esperando","Listo. Pasa el c\\xF3digo a tu amigo.");
+        }
+      }else if(!tBus){
+        cambiarEstado("conectando","Buscando la partida\x2026");
+        api.enviar(JSON.stringify({t:"busco"}));
+        vecesBus=0;
+        tBus=setInterval(function(){
+          if(cerrado||estado==="listo"){ clearInterval(tBus); tBus=null; return; }
+          if(++vecesBus>10){
+            clearInterval(tBus); tBus=null;
+            cambiarEstado("error","Nadie ha abierto una partida con ese c\\xF3digo. P\\xEDdele a tu amigo que le d\\xE9 a invitar.");
+            return;
+          }
+          api.enviar(JSON.stringify({t:"busco"}));
+        },2600);
+      }
+      pintarPanel();
+    }
+
+    tema="idraft179/v1/"+sala;
+    BROKERS179.forEach(function(b){
+      var c={m:null,abierto:false};
+      conex.push(c);
+      c.m=MQTT179();
+      c.m.alAbrir=function(){ c.abierto=true; AlAbrirUna(c); };
+      c.m.alMensaje=function(t,texto){ alLlegarMqtt(texto,c); };
+      c.m.alError=function(){ c.abierto=false; };
+      c.m.alCerrar=function(){ c.abierto=false; };
+      c.m.conectar(b.url,b.user,b.pass,"id179"+Math.random().toString(36).slice(2,10),9000);
+    });
+    return api;
+  }
+
   /* ---------------- elegir c\xF3mo conectar ---------------- */
   function conectar(){
     if(transporteForzado){usarTransporte(transporteForzado(soyAnfitrion()));return}
     if(relayURL()){usarTransporte(TRelay(soyAnfitrion()));return}
-    usarTransporte(TPeer(soyAnfitrion()));
+    // sin servidor propio tiramos con los públicos: cero configuración
+    usarTransporte(TMqtt(soyAnfitrion()));
   }
   function vigilarConexion(){
     setTimeout(function(){
@@ -2420,7 +2684,7 @@ var Online179=(function(){
       reintentarVisible=true;
       if(estado!=="error")cambiarEstado("error","No se ha podido conectar. Comprueba que tienes datos y reint\xE9ntalo.");
       pintarPanel();
-    },22000);
+    },32000);
   }
   function reintentar(){
     reintentarVisible=false;
@@ -2467,6 +2731,17 @@ var Online179=(function(){
       }
       return;
     }
+    if(m.t==="pido"){
+      if(!soyAnfitrion())return;
+      servirTrozos(m.id,m.faltan);
+      return;
+    }
+    if(m.t==="mundoOk"){
+      if(!soyAnfitrion())return;
+      mundoOk179=true;
+      if(tMundo){clearInterval(tMundo);tMundo=null}
+      return;
+    }
     if(m.t==="club"){
       if(!soyAnfitrion())return;
       rival=m.club;
@@ -2488,6 +2763,8 @@ var Online179=(function(){
     importando=false;
     ultimoSello=m.txt||"";
     if(!ok){cambiarEstado("error","No se ha podido cargar la partida.");return}
+    mundoOk179=true;
+    try{enviar({t:"mundoOk"})}catch(e){}
     club=club||m.rival;
     try{c.humanos([m.club,club].filter(Boolean))}catch(e){}
     cambiarEstado("listo","Conectados.");
@@ -2518,6 +2795,10 @@ var Online179=(function(){
   }
   function abrirSelectorInvitado(prohibido){
     var c=Car();if(!c)return;
+    // abrirlo dos veces reconstruye la pantalla y borra lo que ya habías
+    // elegido, así que solo se abre la primera
+    if(selectorAbierto179)return;
+    selectorAbierto179=true;
     c.fijarSlot("online",function(){
       c.humanos(null);
       cerrarPanel();
@@ -2531,6 +2812,13 @@ var Online179=(function(){
           enviar({t:"club",club:id});
           aviso="Equipo elegido. Arrancando la carrera…";
           pintarPanel();
+          // con mala cobertura el mensaje se pierde y el invitado se queda
+          // esperando para siempre: se repite hasta que arranque la carrera
+          var vecesClub=0;
+          var reClub=setInterval(function(){
+            if(arrancado||++vecesClub>6){clearInterval(reClub);return}
+            enviar({t:"club",club:id});
+          },3000);
         }
       });
     });
@@ -2546,6 +2834,18 @@ var Online179=(function(){
     var o={t:"estado",txt:txt};
     if(extra)for(var k in extra)if(k!=="t")o[k]=extra[k];
     enviar(o);
+    // el mundo entero son 12 trozos: si se pierde uno el invitado se queda
+    // colgado, así que se reenvía hasta que confirma que lo tiene
+    if(extra&&extra.tipo==="mundo"&&!mundoOk179){
+      // último recurso: si el otro no ha recibido ni un trozo no puede pedir
+      // nada, así que se le vuelve a mandar el mundo entero de tarde en tarde
+      var vecesMundo=0;
+      if(tMundo)clearInterval(tMundo);
+      tMundo=setInterval(function(){
+        if(mundoOk179||!T||++vecesMundo>3){clearInterval(tMundo);tMundo=null;return}
+        enviar(o);
+      },7000);
+    }
   }
   function nota179(){
     if(!activo())return;
@@ -2891,7 +3191,7 @@ var Online179=(function(){
   /* ---------------- arranque y salida ---------------- */
   function crear(){
     var c=Car();if(!c)return;
-    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;
+    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;invitado179=null;selector179=null;selectorAbierto179=false;
     cambiarEstado("conectando","Preparando la sala…");
     abrirPanel();
     conectar();
@@ -2921,15 +3221,18 @@ var Online179=(function(){
   }
   function unir(cod){
     var c=Car();if(!c)return;
-    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;
+    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;invitado179=null;selector179=null;selectorAbierto179=false;
     cambiarEstado("conectando","Buscando la sala…");
     abrirPanel();
     conectar();
     if(!transporteForzado)vigilarConexion();
   }
   function salir(){
+    if(tMundo){clearInterval(tMundo);tMundo=null}
+    for(var k in chunks){try{if(chunks[k].espera)clearTimeout(chunks[k].espera)}catch(e){}}
+    chunks={};trozos179=null;mundoOk179=false;
     try{if(T&&T.cerrar)T.cerrar()}catch(e){}
-    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;reintentarVisible=false;salaLista=false;
+    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;reintentarVisible=false;salaLista=false;invitado179=null;selector179=null;selectorAbierto179=false;
     cambiarEstado("off","");
     var c=Car();
     try{if(c&&c.humanos)c.humanos(null)}catch(e){}
