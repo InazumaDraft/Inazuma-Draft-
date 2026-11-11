@@ -2212,6 +2212,14 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
 .onl179mas>summary::before{content:"\25B8 "}
 .onl179mas[open]>summary::before{content:"\25BE "}
 .onl179mas[open]>summary{margin-bottom:.7em;opacity:1}
+
+.onl179--espera{background:rgba(4,8,20,.62);align-items:flex-end;padding:10px}
+.onl179--espera .onl179-in{width:min(430px,100%);max-height:74vh;padding:14px 14px 16px;border-radius:12px}
+.onl179--espera .onl179-t{font-size:12px;margin-bottom:8px}
+.onl179--espera .onl179codigo--gran{font-size:clamp(30px,7.6vmin,54px)}
+.onl179--espera .onl179b{padding:11px 12px;font-size:12px}
+.onl179--espera .onl179p{margin-bottom:8px;font-size:12px}
+.onl179--espera .onl179--espera .onl179mini{margin-top:6px}
 </style>
 
 <script>
@@ -2228,7 +2236,7 @@ var Online179=(function(){
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, chunks={}, manualAbierto=false;
+  var transporteForzado=null, chunks={}, manualAbierto=false, mundoListo=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2483,7 +2491,7 @@ var Online179=(function(){
     var clubes=[club,rival];
     c.fijarSlot("online",function(){
       c.humanos(clubes);
-      c.nuevaCon(club);
+      if(!mundoListo){try{c.nuevaCon(club);mundoListo=true}catch(e){}}
       difundir({tipo:"mundo",club:club});
       cambiarEstado("listo","Conectados.");
       aviso="";
@@ -2786,6 +2794,8 @@ var Online179=(function(){
   function abrirPanel(){var d=panel();d.classList.add("is-on");d.setAttribute("aria-hidden","false");pintarPanel()}
   function pintarPanel(){
     var d=panel(),b=d.querySelector("#onl179body");
+    var esperando=!!(soyAnfitrion()&&!arrancado&&sala&&estado!=="off"&&mundoListo);
+    try{d.classList.toggle("onl179--espera",esperando)}catch(e){}
     var h="";
     if(estado==="off"){
       h+='<p class="onl179p">Juega la misma liga con un amigo: mismo mundo, cada uno con su club. Nada avanza si no pulsáis los dos.</p>';
@@ -2801,6 +2811,7 @@ var Online179=(function(){
         h+='<div class="onl179codigo onl179codigo--gran">'+esc(sala)+'</div>';
         h+='<button class="onl179b onl179b--main" data-o="wasap" type="button">Mand\xE1rselo por WhatsApp</button>';
         h+='<button class="onl179b" data-o="copiar" type="button">Copiar el n\xFAmero</button>';
+        h+='<p class="onl179mini">Tu carrera ya est\xE1 lista detr\xE1s. En cuanto tu amigo elija equipo se desbloquea y empez\xE1is los dos.</p>';
       }
       if(aviso)h+='<div class="onl179aviso">'+esc(aviso)+'</div>';
       if(T&&T.codigo){
@@ -2872,7 +2883,7 @@ var Online179=(function(){
   /* ---------------- arranque y salida ---------------- */
   function crear(){
     var c=Car();if(!c)return;
-    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;
+    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;mundoListo=false;
     cambiarEstado("conectando","Preparando la sala…");
     abrirPanel();
     usarTransporte(transporteForzado?transporteForzado(true):TPeer(true));
@@ -2885,15 +2896,24 @@ var Online179=(function(){
         alElegir:function(id){
           club=id;
           var pk=document.getElementById("careerPick");if(pk)pk.classList.remove("is-open");
+          // la carrera del anfitrión arranca ya: se queda dentro esperando a
+          // que su amigo entre, en vez de quedarse en un panel sin partida
+          try{
+            c.fijarSlot("online",function(){
+              c.humanos([id]);
+              if(!mundoListo){try{c.nuevaCon(id);mundoListo=true}catch(e2){mundoListo=false}}
+              try{c._on.fijarVista("mercado");c.pintar()}catch(e3){}
+            });
+          }catch(e){}
           if(estado==="listo"){enviar({t:"hola",club:club});if(rival)arrancarMundo();}
-          if(!(estado==="listo"&&rival)){aviso="";abrirPanel()}
+          if(!(estado==="listo"&&rival)){aviso="Esperando a que tu amigo escriba el n\xFAnmero…";abrirPanel()}
         }
       });
     });
   }
   function unir(cod){
     var c=Car();if(!c)return;
-    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;
+    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;
     cambiarEstado("conectando","Buscando la sala…");
     abrirPanel();
     usarTransporte(transporteForzado?transporteForzado(false):TPeer(false));
@@ -2913,7 +2933,7 @@ var Online179=(function(){
   }
   function salir(){
     try{if(T&&T.cerrar)T.cerrar()}catch(e){}
-    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;manualAbierto=false;
+    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;manualAbierto=false;mundoListo=false;
     cambiarEstado("off","");
     var c=Car();
     try{if(c&&c.humanos)c.humanos(null)}catch(e){}
