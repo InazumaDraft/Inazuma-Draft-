@@ -1,0 +1,10 @@
+{
+  "name": "inazuma-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor de paso para la carrera online de Inazuma Draft",
+  "main": "relay.js",
+  "scripts": { "start": "node relay.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "engines": { "node": ">=18" }
+}

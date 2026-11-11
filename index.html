@@ -2231,12 +2231,26 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
    ========================================================================= */
 var Online179=(function(){
   "use strict";
+  // DIRECCI\xD3N DEL SERVIDOR: pon aqu\xED la URL que te d\xE9 el sitio donde alojes
+  // el relay (empieza por wss://). Si se queda vac\xEDo se intenta la conexi\xF3n
+  // directa entre los dos m\xF3viles, que por datos m\xF3viles falla casi siempre.
+  var RELAY179="";
+  // tambi\xE9n se puede fijar sin tocar el c\xF3digo: #relay=wss://lo-que-sea
+  function relayURL(){
+    var u=String(RELAY179||"").trim();
+    try{
+      var m=/[#&]relay=([^&]+)/.exec(String(location.hash||""));
+      if(m&&m[1]){u=decodeURIComponent(m[1]);try{localStorage.setItem("idraft179.relay",u)}catch(e2){}}
+    }catch(e){}
+    if(!u){try{u=localStorage.getItem("idraft179.relay")||""}catch(e3){}}
+    return String(u||"").trim();
+  }
   var rol=null, sala="", club=null, rival=null;
   var T=null, conn=null, peer=null, pc=null, canal=null;
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, chunks={}, manualAbierto=false, mundoListo=false;
+  var transporteForzado=null, chunks={}, mundoListo=false, reintentarVisible=false, salaLista=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2334,13 +2348,13 @@ var Online179=(function(){
           cambiarEstado("error","No se ha podido abrir la sala. Cierra y vuelve a crear la partida.");return;
         }
         if(t==="network"||t==="server-error"||t==="socket-error"||t==="socket-closed"){
-          if(estado!=="listo"){manualAbierto=true;cambiarEstado("error","No se alcanza el servicio de conexi\xF3n. Despliega «¿No se conecta?» para usar los c\xF3digos largos.")}
+          if(estado!=="listo"){cambiarEstado("error","No se alcanza el servicio de conexi\xF3n. Pulsa Reintentar.")}
           return;
         }
         if(estado!=="listo")cambiarEstado("error","Conexi\xF3n: "+t);
       });
       peer.on("open",function(){
-        if(esHost){cambiarEstado("esperando","Sala lista. Pasa el c\xF3digo a tu amigo.")}
+        if(esHost){salaLista=true;cambiarEstado("esperando","Sala lista. Pasa el c\xF3digo a tu amigo.")}
         else{
           try{conn=peer.connect("idraft179-"+sala,{reliable:true})}catch(e){cambiarEstado("error","No se ha podido llamar a la sala");return}
           cambiarEstado("conectando","Llamando a la sala…");
@@ -2354,7 +2368,7 @@ var Online179=(function(){
       });
     }
     cargarPeerJS(function(ok){
-      if(!ok){manualAbierto=true;if(api.alError)api.alError("No se ha podido cargar la biblioteca de conexi\xF3n. Despliega «¿No se conecta?».");return}
+      if(!ok){if(api.alError)api.alError("No se ha podido cargar la biblioteca de conexi\xF3n. Pulsa Reintentar.");return}
       abrir();
     });
     return api;
@@ -2369,63 +2383,64 @@ var Online179=(function(){
     }
   }
 
-  /* ---------------- transporte manual (código) ---------------- */
-  function TManual(esHost){
+  /* ---------------- servidor de paso (lo normal) ---------------- */
+  function TRelay(esHost){
     var api={};
-    var conf={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
-    try{pc=new RTCPeerConnection(conf)}catch(e){try{pc=new RTCPeerConnection({iceServers:[]})}catch(e2){}}
-    if(!pc){if(api.alError)api.alError("Este navegador no permite la conexión directa.");return api}
-    var dc=null;
-    if(esHost){
-      try{dc=pc.createDataChannel("idraft179")}catch(e){}
-      if(dc){
-        dc.onmessage=function(e){alLlegar(e.data)};
-        dc.onopen=function(){listoCanal()};
-        dc.onclose=function(){cambiarEstado("caido","Se ha cortado la conexión.")};
-      }
-    }else{
-      pc.ondatachannel=function(e){
-        var c=e.channel;
-        c.onmessage=function(ev){alLlegar(ev.data)};
-        c.onopen=function(){listoCanal()};
-        c.onclose=function(){cambiarEstado("caido","Se ha cortado la conexión.")};
-        conn=c;
-      };
-    }
-    pc.onicecandidate=function(e){
-      if(!e.candidate&&pc.localDescription){
-        api.codigo=b64u(JSON.stringify(pc.localDescription));
-        if(api.alCodigo)api.alCodigo(api.codigo);
-        pintarPanel();
-      }
+    var ws=null, url=relayURL();
+    api.enviar=function(txt){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:"msg",txt:txt}))}catch(e){}};
+    api.cerrar=function(){try{if(ws)ws.close()}catch(e){}ws=null};
+    if(!url){if(api.alError)api.alError("sin-relay");return api}
+    try{ws=new WebSocket(url)}catch(e){if(api.alError)api.alError("sin-relay");return api}
+    // el \xABentrar\xBB va en crudo: emandar() lo meter\xEDa en un sobre {t:"msg"}
+    ws.onopen=function(){try{ws.send(JSON.stringify({t:"entrar",sala:sala,rol:esHost?"anfitrion":"invitado"}))}catch(e){}};
+    ws.onmessage=function(e){
+      var o=null;try{o=JSON.parse(e.data)}catch(err){return}
+      if(!o||!o.t)return;
+      if(o.t==="ok"){salaLista=true;if(soyAnfitrion()&&!rival)cambiarEstado("esperando","Sala lista. Pasa el c\xF3digo a tu amigo.");pintarPanel();return}
+      if(o.t==="sala"){if(api.alAbierto)api.alAbierto();return}
+      if(o.t==="lleno"){cambiarEstado("error","Esa partida ya est\xE1 llena.");return}
+      if(o.t==="no"){cambiarEstado("error","Ese c\xF3digo no est\xE1 en ninguna partida abierta. P\xEDdele a tu amigo que abra el juego.");return}
+      if(o.t==="msg"){alLlegar(o.txt);return}
+      if(o.t==="adios"){cambiarEstado("caido","Tu amigo ha salido de la partida.");return}
     };
-    pc.onconnectionstatechange=function(){if(pc&&pc.connectionState==="failed")cambiarEstado("error","La conexión directa ha fallado.")};
-    if(esHost){
-      pc.createOffer().then(function(o){return pc.setLocalDescription(o)}).catch(function(){cambiarEstado("error","No se ha podido crear la invitación.")});
-    }
-    api.enviar=function(txt){try{if(dc)dc.send(txt);else if(conn)conn.send(txt)}catch(e){}};
-    api.cerrar=function(){try{if(pc)pc.close()}catch(e){}pc=null;conn=null;dc=null};
-    api.aceptar=function(txt){
-      var d=null;try{d=JSON.parse(unb64u(txt))}catch(e){}
-      if(!d){cambiarEstado("error","El código de invitación no vale.");return Promise.resolve()}
-      cambiarEstado("conectando","Preparando tu código de respuesta…");
-      return pc.setRemoteDescription(d).then(function(){return pc.createAnswer()}).then(function(a){return pc.setLocalDescription(a)}).catch(function(){cambiarEstado("error","No se ha podido contestar.")});
-    };
-    api.recibir=function(txt){
-      var d=null;try{d=JSON.parse(unb64u(txt))}catch(e){}
-      if(!d){cambiarEstado("error","El código de respuesta no vale.");return Promise.resolve()}
-      cambiarEstado("conectando","Cerrando la conexión…");
-      return pc.setRemoteDescription(d).catch(function(){cambiarEstado("error","No se ha podido cerrar la conexión.")});
-    };
+    ws.onerror=function(){if(api.alError)api.alError("sin-relay")};
+    ws.onclose=function(){if(estado==="listo")cambiarEstado("caido","Se ha cortado la conexi\xF3n.")};
     return api;
   }
 
-  /* ---------------- estado ---------------- */
+  /* ---------------- elegir c\xF3mo conectar ---------------- */
+  function conectar(){
+    if(transporteForzado){usarTransporte(transporteForzado(soyAnfitrion()));return}
+    if(relayURL()){usarTransporte(TRelay(soyAnfitrion()));return}
+    usarTransporte(TPeer(soyAnfitrion()));
+  }
+  function vigilarConexion(){
+    setTimeout(function(){
+      if(estado==="listo")return;
+      reintentarVisible=true;
+      if(estado!=="error")cambiarEstado("error","No se ha podido conectar. Comprueba que tienes datos y reint\xE9ntalo.");
+      pintarPanel();
+    },22000);
+  }
+  function reintentar(){
+    reintentarVisible=false;
+    try{if(T&&T.cerrar)T.cerrar()}catch(e){}
+    T=null;conn=null;chunks={};
+    cambiarEstado("conectando","Reintentando\x2026");
+    pintarPanel();
+    conectar();
+    vigilarConexion();
+  }
   function cambiarEstado(e,txt){
     estado=e;etiqueta=txt||"";
     pintarPanel();
+    // un fallo nunca se queda escondido detras de otra pantalla
+    if((e==="error"||e==="caido")&&rol)setTimeout(function(){
+      if(estado==="error"||estado==="caido")abrirPanel();
+    },80);
   }
   function listoCanal(){
+    salaLista=true;
     cambiarEstado("listo","Conectados.");
     enviar({t:"hola",club:club||null});
     if(!soyAnfitrion()&&!club)aviso="Esperando a que el anfitrión elija equipo…";
@@ -2807,20 +2822,19 @@ var Online179=(function(){
     }else{
       h+='<div class="onl179est onl179est--'+estado+'">'+esc(etiqueta||estado)+'</div>';
       if(soyAnfitrion()&&!arrancado&&sala){
+        if(!salaLista){
+          h+='<p class="onl179p">Todav\xEDa estoy abriendo la sala, un momento…</p>';
+        }else{
         h+='<p class="onl179p">Tu amigo tiene que escribir este n\xFAmero:</p>';
         h+='<div class="onl179codigo onl179codigo--gran">'+esc(sala)+'</div>';
         h+='<button class="onl179b onl179b--main" data-o="wasap" type="button">Mand\xE1rselo por WhatsApp</button>';
         h+='<button class="onl179b" data-o="copiar" type="button">Copiar el n\xFAmero</button>';
         h+='<p class="onl179mini">Tu carrera ya est\xE1 lista detr\xE1s. En cuanto tu amigo elija equipo se desbloquea y empez\xE1is los dos.</p>';
+        }
       }
       if(aviso)h+='<div class="onl179aviso">'+esc(aviso)+'</div>';
-      if(T&&T.codigo){
-        h+='<details class="onl179mas"'+(manualAbierto?" open":"")+'><summary>'+(soyAnfitrion()?"Si no se conecta, m\xE1ndale este c\xF3digo":"Si no se conecta, pega aqu\xED su c\xF3digo")+'</summary>';
-        h+='<textarea class="onl179in onl179in--ta" id="onl179sdp" readonly rows="3">'+esc(T.codigo||"")+'</textarea>';
-        h+='<button class="onl179b" data-o="copiarsdp" type="button">Copiar mi c\xF3digo</button>';
-        h+='<textarea class="onl179in onl179in--ta" id="onl179sdpin" rows="3" placeholder="PEGA AQU\xCD EL C\xD3DIGO DEL OTRO"></textarea>';
-        h+='<button class="onl179b onl179b--main" data-o="pegarsdp" type="button">Pegar y conectar</button>';
-        h+='</details>';
+      if(reintentarVisible&&estado!=="listo"){
+        h+='<button class="onl179b onl179b--main" data-o="reintentar" type="button">Reintentar</button>';
       }
       h+='<button class="onl179b onl179b--mal" data-o="salir" type="button">Salir de la partida online</button>';
     }
@@ -2852,13 +2866,7 @@ var Online179=(function(){
     }
     else if(o==="copiar")copiar(sala,"Número copiado: "+sala);
     else if(o==="wasap")wasap();
-    else if(o==="copiarsdp"){var t=document.getElementById("onl179sdp");copiar(t?t.value:"","Código copiado")}
-    else if(o==="pegarsdp"){
-      var ti=document.getElementById("onl179sdpin");
-      var txt=String((ti&&ti.value)||"").trim();
-      if(!txt){toast("Pega el código",2200);return}
-      if(soyAnfitrion())T.recibir(txt);else T.aceptar(txt);
-    }
+    else if(o==="reintentar")reintentar();
     else if(o==="salir")salir();
   }
   function wasap(){
@@ -2883,11 +2891,11 @@ var Online179=(function(){
   /* ---------------- arranque y salida ---------------- */
   function crear(){
     var c=Car();if(!c)return;
-    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;mundoListo=false;
+    rol="anfitrion";sala=codigoSala();club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;
     cambiarEstado("conectando","Preparando la sala…");
     abrirPanel();
-    usarTransporte(transporteForzado?transporteForzado(true):TPeer(true));
-    if(!transporteForzado)vigilarPeer();
+    conectar();
+    if(!transporteForzado)vigilarConexion();
     c.fijarSlot("online",function(){
       c.humanos(null);
       cerrarPanel();
@@ -2913,27 +2921,15 @@ var Online179=(function(){
   }
   function unir(cod){
     var c=Car();if(!c)return;
-    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;
+    rol="invitado";sala=cod;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;salaLista=false;
     cambiarEstado("conectando","Buscando la sala…");
     abrirPanel();
-    usarTransporte(transporteForzado?transporteForzado(false):TPeer(false));
-    if(!transporteForzado)vigilarPeer();
-  }
-  function vigilarPeer(){
-    setTimeout(function(){
-      if(estado==="listo")return;
-      if(T&&T.codigo)return;
-      try{if(T&&T.cerrar)T.cerrar()}catch(e){}
-      usarTransporte(TManual(soyAnfitrion()));
-      manualAbierto=true;
-      cambiarEstado("conectando",soyAnfitrion()?"Conexión directa: manda tu código a tu amigo.":"Conexión directa: pega el código de tu amigo.");
-      setTimeout(pintarPanel,1200);
-      setTimeout(pintarPanel,4000);
-    },11000);
+    conectar();
+    if(!transporteForzado)vigilarConexion();
   }
   function salir(){
     try{if(T&&T.cerrar)T.cerrar()}catch(e){}
-    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;manualAbierto=false;mundoListo=false;
+    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;mundoListo=false;reintentarVisible=false;salaLista=false;
     cambiarEstado("off","");
     var c=Car();
     try{if(c&&c.humanos)c.humanos(null)}catch(e){}
@@ -2967,6 +2963,7 @@ var Online179=(function(){
     cerrarPuerta:reset,estado:function(){return estado},club:function(){return club},rival:function(){return rival},sala:function(){return sala},aviso:function(){return aviso},
     pasoPendiente:function(){var p=pasoPendiente();return p?{paso:p.paso,yo:!!p.P.yo,el:!!p.P.el,hecho:!!p.P.hecho,modoYo:p.P.modoYo,modoEl:p.P.modoEl}:null},
     _prueba:function(t){transporteForzado=t},
+    _relay:function(u){try{if(u==null)localStorage.removeItem("idraft179.relay");else localStorage.setItem("idraft179.relay",String(u))}catch(e){}},
     _pinchar:function(o){recibir(o)},
     _poner:function(o){for(var k in o){if(k==="rol")rol=o[k];else if(k==="club")club=o[k];else if(k==="rival")rival=o[k];else if(k==="estado")estado=o[k];else if(k==="arrancado")arrancado=o[k]}},
     _mensaje:function(txt){alLlegar(txt)}
