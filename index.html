@@ -2203,6 +2203,15 @@ window.MUNECO_KITS={"raimon":[[[[239,201,56],[34,99,164],[245,243,233],[33,115,1
 @keyframes onl179p{0%,100%{opacity:.25}50%{opacity:1}}
 .cp-team.is-off{opacity:.32;filter:grayscale(1)}
 .cp-team.is-off b::after{content:" · tu rival";color:#ffd21f}
+
+.onl179in--cod{display:block;margin:0 auto;padding:.55em .3em .55em .7em;max-width:13em;text-align:center;font-size:clamp(24px,5.6vmin,38px);font-weight:900;letter-spacing:.44em;text-indent:.44em;font-variant-numeric:tabular-nums;line-height:1.15}
+.onl179codigo--gran{font-size:clamp(34px,9vmin,64px);font-weight:900;letter-spacing:.34em;text-indent:.34em;font-variant-numeric:tabular-nums;line-height:1.2}
+.onl179mas{margin:1em 0 0;border-top:1px solid rgba(255,255,255,.16);padding-top:.7em}
+.onl179mas>summary{cursor:pointer;list-style:none;font-size:.82em;font-weight:800;letter-spacing:.09em;text-transform:uppercase;opacity:.82}
+.onl179mas>summary::-webkit-details-marker{display:none}
+.onl179mas>summary::before{content:"\25B8 "}
+.onl179mas[open]>summary::before{content:"\25BE "}
+.onl179mas[open]>summary{margin-bottom:.7em;opacity:1}
 </style>
 
 <script>
@@ -2219,7 +2228,7 @@ var Online179=(function(){
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, chunks={};
+  var transporteForzado=null, chunks={}, manualAbierto=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2243,8 +2252,8 @@ var Online179=(function(){
     }catch(e){return ""}
   }
   function codigoSala(){
-    var a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",o="";
-    for(var i=0;i<6;i++)o+=a[Math.floor(Math.random()*a.length)];
+    var o="";
+    for(var i=0;i<5;i++)o+=String(Math.floor(Math.random()*10));
     return o;
   }
   function enlace(){return location.href.split("#")[0]+"#on="+sala}
@@ -2295,20 +2304,35 @@ var Online179=(function(){
   }
   function TPeer(esHost){
     var api={};
+    var intentos=0;
     api.enviar=function(txt){try{if(conn)conn.send(txt)}catch(e){}};
-    api.cerrar=function(){try{if(conn)conn.close()}catch(e){}try{if(peer)peer.destroy()}catch(e){}conn=null;peer=null};
-    cargarPeerJS(function(ok){
-      if(!ok){if(api.alError)api.alError("No se ha podido cargar la biblioteca de conexión. Prueba el modo manual.");return}
+    api.cerrar=function(){intentos=99;try{if(conn)conn.close()}catch(e){}try{if(peer)peer.destroy()}catch(e){}conn=null;peer=null};
+    function abrir(){
       var opt={debug:0,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]}};
       try{peer=new window.Peer(esHost?("idraft179-"+sala):undefined,opt)}catch(e){if(api.alError)api.alError("No se ha podido abrir la sala");return}
       peer.on("error",function(e){
         var t=(e&&e.type)||"error";
-        if(t==="peer-unavailable"){cambiarEstado("error","Ese código no está en ninguna sala abierta.");return}
-        if(t==="unavailable-id"){cambiarEstado("error","Ese código ya está en uso.");return}
-        if(estado!=="listo")cambiarEstado("error","Conexión: "+t);
+        if(t==="peer-unavailable"){cambiarEstado("error","Ese c\xF3digo no est\xE1 en ninguna sala abierta. P\xEDdele a tu amigo que abra la partida.");return}
+        if(t==="unavailable-id"){
+          // el n\xFAmero lo est\xE1 usando otro: probamos con otro sin molestar al usuario
+          intentos++;
+          if(esHost&&intentos<5){
+            try{if(peer)peer.destroy()}catch(e2){}
+            peer=null;sala=codigoSala();
+            cambiarEstado("conectando","Preparando la sala…");
+            setTimeout(abrir,400);
+            return;
+          }
+          cambiarEstado("error","No se ha podido abrir la sala. Cierra y vuelve a crear la partida.");return;
+        }
+        if(t==="network"||t==="server-error"||t==="socket-error"||t==="socket-closed"){
+          if(estado!=="listo"){manualAbierto=true;cambiarEstado("error","No se alcanza el servicio de conexi\xF3n. Despliega «¿No se conecta?» para usar los c\xF3digos largos.")}
+          return;
+        }
+        if(estado!=="listo")cambiarEstado("error","Conexi\xF3n: "+t);
       });
       peer.on("open",function(){
-        if(esHost){cambiarEstado("esperando","Sala preparada. Comparte el enlace.")}
+        if(esHost){cambiarEstado("esperando","Sala lista. Pasa el c\xF3digo a tu amigo.")}
         else{
           try{conn=peer.connect("idraft179-"+sala,{reliable:true})}catch(e){cambiarEstado("error","No se ha podido llamar a la sala");return}
           cambiarEstado("conectando","Llamando a la sala…");
@@ -2317,9 +2341,13 @@ var Online179=(function(){
       });
       peer.on("connection",function(c){
         if(!esHost)return;
-        cambiarEstado("conectando","Está entrando tu amigo…");
+        cambiarEstado("conectando","Est\xE1 entrando tu amigo…");
         conn=c;enganchar(c,true);
       });
+    }
+    cargarPeerJS(function(ok){
+      if(!ok){manualAbierto=true;if(api.alError)api.alError("No se ha podido cargar la biblioteca de conexi\xF3n. Despliega «¿No se conecta?».");return}
+      abrir();
     });
     return api;
   }
@@ -2328,8 +2356,8 @@ var Online179=(function(){
     if(peerjs){
       c.on("data",function(d){if(typeof d==="string")alLlegar(d);else alLlegar(String(d))});
       c.on("open",function(){listoCanal()});
-      c.on("close",function(){cambiarEstado("caido","Se ha cortado la conexión.")});
-      c.on("error",function(){if(estado==="listo")cambiarEstado("caido","Se ha cortado la conexión.")});
+      c.on("close",function(){cambiarEstado("caido","Se ha cortado la conexi\xF3n.")});
+      c.on("error",function(){if(estado==="listo")cambiarEstado("caido","Se ha cortado la conexi\xF3n.")});
     }
   }
 
@@ -2405,12 +2433,13 @@ var Online179=(function(){
         if(m.club)rival=m.club;
         enviar({t:"hola",club:club||null});
         if(club&&rival)arrancarMundo();
-        else{aviso="Comparte el enlace con tu amigo para que elija equipo.";pintarPanel()}
+        else if(rival){aviso="Tu amigo est\xE1 eligiendo equipo…";pintarPanel()}
+        else{aviso="Tu amigo acaba de entrar. Espera a que elija equipo.";pintarPanel()}
       }else{
         if(m.club){
           rival=m.club;
           if(club)enviar({t:"club",club:club});
-          else abrirSelectorInvitado(m.club);
+          else{aviso="Conectado. Ahora elige tu equipo.";abrirSelectorInvitado(m.club);pintarPanel()}
         }else{aviso="Esperando a que el anfitrión elija equipo…";pintarPanel()}
       }
       return;
@@ -2458,8 +2487,10 @@ var Online179=(function(){
       difundir({tipo:"mundo",club:club});
       cambiarEstado("listo","Conectados.");
       aviso="";
+      try{c._on.fijarVista("mercado");c.pintar()}catch(e){}
       cerrarPanel();
       pintarPanel();
+      try{toast("¡Empieza la carrera! Llevas "+c.nombre(club),3600)}catch(e){}
     });
   }
   function abrirSelectorInvitado(prohibido){
@@ -2475,7 +2506,7 @@ var Online179=(function(){
           c.humanos([prohibido,id]);
           var pk=document.getElementById("careerPick");if(pk)pk.classList.remove("is-open");
           enviar({t:"club",club:id});
-          aviso="Esperando la copia de la partida…";
+          aviso="Equipo elegido. Arrancando la carrera…";
           pintarPanel();
         }
       });
@@ -2758,43 +2789,58 @@ var Online179=(function(){
     var h="";
     if(estado==="off"){
       h+='<p class="onl179p">Juega la misma liga con un amigo: mismo mundo, cada uno con su club. Nada avanza si no pulsáis los dos.</p>';
-      h+='<button class="onl179b onl179b--main" data-o="crear" type="button">Crear partida (tú invitas)</button>';
-      h+='<div class="onl179sep">o únete con su código</div>';
-      h+='<input class="onl179in" id="onl179cod" type="text" inputmode="latin" autocomplete="off" maxlength="12" placeholder="CÓDIGO">';
-      h+='<button class="onl179b" data-o="unir" type="button">Unirme a la partida</button>';
+      h+='<button class="onl179b onl179b--main" data-o="crear" type="button">Invitar a un amigo</button>';
+      h+='<div class="onl179sep">o entra con su número</div>';
+      h+='<input class="onl179in onl179in--cod" id="onl179cod" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="5" placeholder="00000" aria-label="Número de 5 cifras">';
+      h+='<button class="onl179b" data-o="unir" type="button">Entrar</button>';
       h+='<p class="onl179mini">Tu carrera de siempre no se toca: la partida online se guarda aparte.</p>';
     }else{
       h+='<div class="onl179est onl179est--'+estado+'">'+esc(etiqueta||estado)+'</div>';
-      if(soyAnfitrion()&&estado!=="listo"){
-        h+='<p class="onl179p">Manda este enlace a tu amigo:</p>';
-        h+='<div class="onl179codigo">'+esc(sala)+'</div>';
-        h+='<button class="onl179b" data-o="copiar" type="button">Copiar enlace de invitación</button>';
-        h+='<textarea class="onl179in onl179in--ta" id="onl179link" readonly rows="2">'+esc(enlace())+'</textarea>';
-      }
-      if(T&&T.codigo&&estado!=="listo"){
-        h+='<p class="onl179p">'+(soyAnfitrion()?"Manda este código a tu amigo y pega aquí el que te mande él:":"Pega aquí el código de invitación y mándale a tu amigo el código de respuesta que sale abajo:")+'</p>';
-        h+='<textarea class="onl179in onl179in--ta" id="onl179sdp" readonly rows="3">'+esc(T.codigo||"")+'</textarea>';
-        h+='<button class="onl179b" data-o="copiarsdp" type="button">Copiar mi código</button>';
-        h+='<textarea class="onl179in onl179in--ta" id="onl179sdpin" rows="3" placeholder="PEGA AQUÍ EL CÓDIGO DEL OTRO"></textarea>';
-        h+='<button class="onl179b onl179b--main" data-o="pegarsdp" type="button">Pegar y conectar</button>';
+      if(soyAnfitrion()&&!arrancado&&sala){
+        h+='<p class="onl179p">Tu amigo tiene que escribir este n\xFAmero:</p>';
+        h+='<div class="onl179codigo onl179codigo--gran">'+esc(sala)+'</div>';
+        h+='<button class="onl179b onl179b--main" data-o="wasap" type="button">Mand\xE1rselo por WhatsApp</button>';
+        h+='<button class="onl179b" data-o="copiar" type="button">Copiar el n\xFAmero</button>';
       }
       if(aviso)h+='<div class="onl179aviso">'+esc(aviso)+'</div>';
+      if(T&&T.codigo){
+        h+='<details class="onl179mas"'+(manualAbierto?" open":"")+'><summary>'+(soyAnfitrion()?"Si no se conecta, m\xE1ndale este c\xF3digo":"Si no se conecta, pega aqu\xED su c\xF3digo")+'</summary>';
+        h+='<textarea class="onl179in onl179in--ta" id="onl179sdp" readonly rows="3">'+esc(T.codigo||"")+'</textarea>';
+        h+='<button class="onl179b" data-o="copiarsdp" type="button">Copiar mi c\xF3digo</button>';
+        h+='<textarea class="onl179in onl179in--ta" id="onl179sdpin" rows="3" placeholder="PEGA AQU\xCD EL C\xD3DIGO DEL OTRO"></textarea>';
+        h+='<button class="onl179b onl179b--main" data-o="pegarsdp" type="button">Pegar y conectar</button>';
+        h+='</details>';
+      }
       h+='<button class="onl179b onl179b--mal" data-o="salir" type="button">Salir de la partida online</button>';
     }
     b.innerHTML=h;
     Array.prototype.forEach.call(b.querySelectorAll("[data-o]"),function(x){
       x.addEventListener("click",function(){accion(x.dataset.o)});
     });
+    var inCod=document.getElementById("onl179cod");
+    if(inCod){
+      try{inCod.focus()}catch(e){}
+      inCod.addEventListener("input",function(){
+        var v=String(inCod.value||"").replace(/\D/g,"").slice(0,5);
+        if(inCod.value!==v)inCod.value=v;
+        if(v.length===5)setTimeout(function(){accion("unir",v)},150);
+      });
+      inCod.addEventListener("keydown",function(ev){
+        if(ev.key==="Enter"){ev.preventDefault();accion("unir")}
+      });
+    }
   }
-  function accion(o){
+  function accion(o,valor){
     if(o==="crear")crear();
     else if(o==="unir"){
       var i=document.getElementById("onl179cod");
-      var cod=String((i&&i.value)||"").trim().toUpperCase();
-      if(!cod){toast("Escribe el código de tu amigo",2200);return}
+      var cod=String(valor!=null?valor:((i&&i.value)||"")).replace(/\D/g,"").slice(0,5);
+      if(cod.length!==5){toast("El código son 5 números",2400);return}
+      if(i)i.value=cod;
       unir(cod);
     }
-    else if(o==="copiar")copiar(enlace(),"Enlace copiado");
+    else if(o==="copiar")copiar(sala,"Número copiado: "+sala);
+    else if(o==="wasap")wasap();
     else if(o==="copiarsdp"){var t=document.getElementById("onl179sdp");copiar(t?t.value:"","Código copiado")}
     else if(o==="pegarsdp"){
       var ti=document.getElementById("onl179sdpin");
@@ -2803,6 +2849,13 @@ var Online179=(function(){
       if(soyAnfitrion())T.recibir(txt);else T.aceptar(txt);
     }
     else if(o==="salir")salir();
+  }
+  function wasap(){
+    var txt="Entra a mi carrera de Inazuma Draft: escribe el c\xF3digo "+sala+" en el juego, o abre "+enlace();
+    var url="https://wa.me/?text="+encodeURIComponent(txt);
+    var w=null;
+    try{w=window.open(url,"_blank")}catch(e){}
+    if(!w)copiar(sala+" · "+enlace(),"No se ha abierto WhatsApp: te he copiado el código y el enlace");
   }
   function copiar(txt,msg){
     var hecho=false;
@@ -2828,12 +2881,12 @@ var Online179=(function(){
       c.humanos(null);
       cerrarPanel();
       c.elegirEquipo({
-        aviso:"Elige tu equipo. Después verás el enlace para invitar a tu amigo.",
+        aviso:"Elige tu equipo. Después te daré un número de 5 cifras para pasárselo a tu amigo.",
         alElegir:function(id){
           club=id;
           var pk=document.getElementById("careerPick");if(pk)pk.classList.remove("is-open");
           if(estado==="listo"){enviar({t:"hola",club:club});if(rival)arrancarMundo();}
-          if(!(estado==="listo"&&rival)){aviso="Comparte el enlace con tu amigo para que elija equipo.";abrirPanel()}
+          if(!(estado==="listo"&&rival)){aviso="";abrirPanel()}
         }
       });
     });
@@ -2852,14 +2905,15 @@ var Online179=(function(){
       if(T&&T.codigo)return;
       try{if(T&&T.cerrar)T.cerrar()}catch(e){}
       usarTransporte(TManual(soyAnfitrion()));
-      cambiarEstado("conectando",soyAnfitrion()?"Modo manual: manda tu código a tu amigo.":"Modo manual: pega el código de tu amigo.");
+      manualAbierto=true;
+      cambiarEstado("conectando",soyAnfitrion()?"Conexión directa: manda tu código a tu amigo.":"Conexión directa: pega el código de tu amigo.");
       setTimeout(pintarPanel,1200);
       setTimeout(pintarPanel,4000);
     },11000);
   }
   function salir(){
     try{if(T&&T.cerrar)T.cerrar()}catch(e){}
-    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;
+    T=null;conn=null;rol=null;club=null;rival=null;puertas={};arrancado=false;manualAbierto=false;
     cambiarEstado("off","");
     var c=Car();
     try{if(c&&c.humanos)c.humanos(null)}catch(e){}
@@ -2874,12 +2928,13 @@ var Online179=(function(){
   /* ---------------- enlace de invitación ---------------- */
   function autoArranque(){
     if(arrancado)return;
-    var m=/[#&]on=([A-Za-z0-9\-_]+)/.exec(String(location.hash||""));
+    var m=/[#&]on=([0-9]{5})(?:[^0-9A-Za-z]|$)/.exec(String(location.hash||""))||/[#&]on=([A-Za-z0-9\-_]+)/.exec(String(location.hash||""));
     if(!m)return;
     var cod=m[1];
     setTimeout(function(){
       if(estado!=="off"||!window.Carrera)return;
       abrirPanel();
+      var i=document.getElementById("onl179cod");if(i)i.value=cod;
       unir(cod);
     },1200);
   }
