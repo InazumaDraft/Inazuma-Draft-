@@ -1676,17 +1676,31 @@ function sembrarM179(h,a,esCopa){
 function motorPartido(h,a,continuar,alCancelar,eliminatoria){jugando=true;montar();$c("#career").classList.remove("is-open");$c("#career").setAttribute("aria-hidden","true");try{Pick.home=h;Pick.away=a}catch(e){}var cerrado=false;finalMotor149=function finalMotor1492(){if(!cerrado&&!C.partidoPendiente149)pendiente149(h,a,resultadoMotor149(h,a),eliminatoria?"playoff":"liga")};function cont(){if(cerrado)return;cerrado=true;window.__rogueFallback=null;var goles=(M.goles||[]).map(function(x){var e=x.eq===0?h:a;var rr=resolverJugador(e,{num:x.num,largo:x.nombre,nom:x.corto});return{eq:e,jug:x.num||0,pid:rr?rr.p.pid:null,nom:x.corto,largo:x.nombre,cara:x.cara,tec:x.tec,min:x.min,oro:!!x.oro,lado:x.eq===0?"h":"a"}});var r={h,a,gh:M.marcador[0],ga:M.marcador[1],jugado:true,goles,oro:M.oro||null,tiempoReglamentario:M.reglamentario?M.reglamentario.slice():null,stats:{tiros:M.stats.tiros.slice(),pases:M.stats.pases.slice(),posesion:[Math.round(100*(M.stats.pases[0]+1)/(M.stats.pases[0]+M.stats.pases[1]+2)),0],duelos:M.stats.duelos.slice(),paradas:paradasDe(M.stats)}};r.stats.posesion[1]=100-r.stats.posesion[0];finalMotor149=null;delete C.partidoPendiente149;continuar(r)}function canc(){finalMotor149=null;window.__rogueFallback=null;if(cerrado)return;cerrado=true;jugando=false;vista="inicio";pintar();if(alCancelar)alCancelar()}// Si el motor del partido no carga con datos móviles, se simula: el resultado
 // llega igual y la partida online no se queda esperando a nadie.
   window.__rogueFallback=function(){if(cerrado)return;if(!sembrarM179(h,a,eliminatoria))return;cont()};
-  prepararMotorCarrera(h,a,eliminatoria);if(window.PARTIDO&&PARTIDO.prepararCarrera)PARTIDO.prepararCarrera(cont,canc);launchMatch()}function jugarYo(h,a){if(abierto126()){vista="mercado";pintar();return}if(window.Online179&&Online179.activo()){Online179.puerta("partido",{modo:"jugar"},function(){jugarYoLocal(h,a)});return}jugarYoLocal(h,a)}
+  prepararMotorCarrera(h,a,eliminatoria);if(window.PARTIDO&&PARTIDO.prepararCarrera)PARTIDO.prepararCarrera(cont,canc);launchMatch()}function jugarYo(h,a){if(abierto126()){vista="mercado";pintar();return}jugarYoLocal(h,a)}
 function jugarYoLocal(h,a){var d=C.div[C.mi];var jor=jornadasJugadas(d)+1;motorPartido(h,a,function(r){if(window.Online179&&Online179.activo()){Online179.resultado("partido",r,{jor:jor,d:d});return}simularJornada(r);hojaJornada179(r,jor,d)})}
 function hojaJornada179(r,jor,d){volverACarrera();if(r)hojaResultado(detallePartido(r,"Tu partido \xB7 Jornada "+jor+" \xB7 "+DIV[d||C.div[C.mi]])+bloqueJornada(jor)+(fechasCopa141().indexOf(jor)>=0?bloqueCopaUltima():""))}
-function simularJornadaRapida179(){var p=proximoPartido();if(!p)return;var d=C.div[C.mi];var jor=jornadasJugadas(d)+1;function lanzar179(){var r=Object.assign(simular(p.h,p.a,false),{jugado:true});r.jugado=true;directoSim(p.h,p.a,r,function(){if(window.Online179&&Online179.activo()){Online179.resultado("partido",r,{jor:jor,d:d});return}simularJornada(r);hojaJornada179(r,jor,d)})}if(window.Online179&&Online179.activo()){Online179.puerta("partido",{modo:"simular"},lanzar179);return}lanzar179()}
-function descanso179(){if(window.Online179&&Online179.activo()){Online179.puerta("partido",{modo:"descanso"},null);return}simularJornada(null);pintar()}function ligaTerminada(){if(!C||!C.liga)return false;return[1,2].every(function(d){var L=C.liga[d];return L&&L.jornada>=L.cal.length})}function miLigaTerminada(){if(!C||!C.liga||!C.div)return false;var d=C.div[C.mi];return!!C.liga[d]&&jornadasJugadas(d)>=jornadasDe(d)}function prepararPlayoffs(){if(!C.po||C.po.temp!==C.temp){completarLigas();crearPlayoffs()}avanzarPlayoffs()}function partidoNuevo(et,h,a){return{et,h,a,gh:null,ga:null,jugado:false,oro:null}}function crearPlayoffs(){var t1=tabla(1),t2=tabla(2);if(C.po&&C.po.temp===C.temp){if(!C.po.p2)C.po.p2={directos:[t2[0]?t2[0].id:null,t2[1]?t2[1].id:null],tercero:null,semis:[partidoNuevo("Semifinal 1",t2[2]?t2[2].id:null,t2[5]?t2[5].id:null),partidoNuevo("Semifinal 2",t2[3]?t2[3].id:null,t2[4]?t2[4].id:null)],final:null};return C.po}C.po={temp:C.temp,p1:{primeros:t1[0]?t1[0].id:null,campeon:null,semis:[partidoNuevo("Semifinal 1",t1[1]?t1[1].id:null,t1[4]?t1[4].id:null),partidoNuevo("Semifinal 2",t1[2]?t1[2].id:null,t1[3]?t1[3].id:null)],final:null,finalisima:null},p2:{directos:[t2[0]?t2[0].id:null,t2[1]?t2[1].id:null],tercero:null,semis:[partidoNuevo("Semifinal 1",t2[2]?t2[2].id:null,t2[5]?t2[5].id:null),partidoNuevo("Semifinal 2",t2[3]?t2[3].id:null,t2[4]?t2[4].id:null)],final:null}};guardar();return C.po}function ganadorDe(p){if(!p||!p.jugado||p.gh==null||p.ga==null)return null;return p.gh>=p.ga?p.h:p.a}function avanzarPlayoffs(){var po=C.po;if(!po)return;var t1=tabla(1),p1=po.p1;if(p1&&!p1.final){var g=p1.semis.map(ganadorDe);if(g[0]&&g[1]){var c=casaMejor(g[0],g[1],t1);p1.final=partidoNuevo("Final",c[0],c[1])}}else if(p1&&p1.final&&p1.final.jugado&&!p1.finalisima){p1.finalisima=partidoNuevo("Final\xEDsima",p1.primeros,ganadorDe(p1.final))}else if(p1&&p1.finalisima&&p1.finalisima.jugado&&!p1.campeon&&ganadorDe(p1.finalisima)){p1.campeon=ganadorDe(p1.finalisima)}var t2=tabla(2),p2=po.p2;if(p2&&!p2.final){var _g=p2.semis.map(ganadorDe);if(_g[0]&&_g[1]){var _c=casaMejor(_g[0],_g[1],t2);p2.final=partidoNuevo("Final por el ascenso",_c[0],_c[1])}}else if(p2&&p2.final&&p2.final.jugado&&!p2.tercero&&ganadorDe(p2.final)){p2.tercero=ganadorDe(p2.final)}}function pendientesPlayoff(){var po=C.po,out=[];if(!po)return out;["p1","p2"].forEach(function(k){var b=po[k];if(!b)return;(b.semis||[]).forEach(function(p){if(p&&!p.jugado&&p.h&&p.a)out.push({b:k,p})});if(b.final&&!b.final.jugado&&b.final.h&&b.final.a)out.push({b:k,p:b.final});if(b.finalisima&&!b.finalisima.jugado&&b.finalisima.h&&b.finalisima.a)out.push({b:k,p:b.finalisima})});return out}function playoffTerminado(){var po=C.po;if(!po)return true;return!!(po.p1&&po.p1.campeon)&&!!(po.p2&&po.p2.tercero)}function miPartidoPlayoff(){var po=C.po;if(!po||!C.mi)return null;var lista=pendientesPlayoff();for(var i=0;i<lista.length;i++){var p=lista[i].p;if(p.h===C.mi||p.a===C.mi){var div=lista[i].b==="p1"?1:2;return{p,div,et:p.et+" \xB7 "+DIV[div]}}}return null}function simularPartidoPlayoff(p){var r=partidoOro(p.h,p.a);p.gh=r.gh;p.ga=r.ga;p.jugado=true;p.oro=r.oro||null;p.golesRes=r.goles?r.goles.slice():[];p.stats=r.stats||null;p.tiempoReglamentario=r.tiempoReglamentario||null;if(p.comp==="copa"){}else{registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga")}}function simularPlayoffs(){if(!C.po)crearPlayoffs();var vueltas=0;while(vueltas++<12){var pend=pendientesPlayoff();if(!pend.length)break;pend.forEach(function(x){simularPartidoPlayoff(x.p)});avanzarPlayoffs()}guardar()}function cerrarRondaPlayoff(pendientes,propio){pendientes.forEach(function(x){if(x.p!==propio&&!x.p.jugado)simularPartidoPlayoff(x.p)});avanzarPlayoffs();guardar();vista="inicio";pintar()}function simularRondaPlayoff(){if(window.Online179&&Online179.activo()){Online179.puerta("playoff",{modo:"simular"},simularRondaPlayoffLocal);return}simularRondaPlayoffLocal()}
-function simularRondaPlayoffLocal(){prepararPlayoffs();var pendientes=pendientesPlayoff().slice(),m=miPartidoPlayoff();if(!m){cerrarRondaPlayoff(pendientes,null);hojaResultado('<div class="cr-sheet-h">Playoffs \xB7 resultados de la ronda</div>'+bloquePlayoffs());return}var p=m.p,r=Object.assign(partidoOro(p.h,p.a),{h:p.h,a:p.a,jugado:true});directoSim(p.h,p.a,r,function(){p.gh=r.gh;p.ga=r.ga;p.jugado=true;p.oro=r.oro||null;p.golesRes=(r.goles||[]).slice();p.stats=r.stats||null;p.tiempoReglamentario=r.tiempoReglamentario||null;registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga");cerrarRondaPlayoff(pendientes,p);hojaResultado(detallePartido(r,m.et)+bloquePlayoffs())})}function jugarPlayoff(){if(window.Online179&&Online179.activo()&&miPartidoPlayoff()){Online179.puerta("playoff",{modo:"jugar"},jugarPlayoffLocal);return}jugarPlayoffLocal()}
-function jugarPlayoffLocal(){var m=miPartidoPlayoff();if(!m){simularRondaPlayoffLocal();return}var pendientes=pendientesPlayoff().slice();var p=m.p;motorPartido(p.h,p.a,function(r){if(window.Online179&&Online179.activo()){Online179.resultado("playoff",r,{et:m.p.et,div:m.div,h:p.h,a:p.a});return}var reg=r.tiempoReglamentario||[r.gh,r.ga];var rr=r;p.gh=rr.gh;p.ga=rr.ga;p.jugado=true;p.oro=rr.oro||null;p.golesRes=(rr.goles||[]).slice();p.stats=r.stats||null;p.tiempoReglamentario=reg[0]===reg[1]?reg:null;registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga");pendientes.forEach(function(x){if(x.p!==p&&!x.p.jugado)simularPartidoPlayoff(x.p)});avanzarPlayoffs();guardar();jugando=false;try{exitMatch()}catch(e){}vista="inicio";pintar();hojaResultado(detallePartido({h:p.h,a:p.a,gh:p.gh,ga:p.ga,goles:p.golesRes||[],oro:p.oro,stats:p.stats,tiempoReglamentario:p.tiempoReglamentario},p.et+" \xB7 "+DIV[m.div])+bloquePlayoffs())},null,true)}function simularMiCopa(){if(window.Online179&&Online179.activo()&&copaPendiente()){Online179.puerta("copa",{modo:"simular"},simularMiCopaLocal);return null}return simularMiCopaLocal()}
-function simularMiCopaLocal(){var cp=copaPendiente();if(!cp)return null;var ri=C.copa.ronda;var nombreRonda=rondaCopa141(ri);var r=Object.assign(simular(cp.h,cp.a,true),{h:cp.h,a:cp.a});var reg=[r.gh,r.ga];golDeOro(r);r.tiempoReglamentario=reg[0]===reg[1]?reg:null;directoSim(cp.h,cp.a,r,function(){if(window.Online179&&Online179.activo()){Online179.resultado("copa",r,{ri:ri,nombreRonda:nombreRonda,h:cp.h,a:cp.a});return}cerrarMiCopa(cp,r);vista="inicio";pintar();hojaResultado(detallePartido(cp,"Copa Frontier \xB7 "+nombreRonda)+bloqueCopa(ri,true)+bloqueJornada(C.ultimaJornada))});return cp}function jugarYoCopa(){if(window.Online179&&Online179.activo()&&!abierto126()&&copaPendiente()){Online179.puerta("copa",{modo:"jugar"},jugarYoCopaLocal);return}jugarYoCopaLocal()}
+function simularJornadaRapida179(){var p=proximoPartido();if(!p)return;var d=C.div[C.mi];var jor=jornadasJugadas(d)+1;function lanzar179(){var r=Object.assign(simular(p.h,p.a,false),{jugado:true});r.jugado=true;directoSim(p.h,p.a,r,function(){if(window.Online179&&Online179.activo()){Online179.resultado("partido",r,{jor:jor,d:d});return}simularJornada(r);hojaJornada179(r,jor,d)})}lanzar179()}
+function descanso179(){simularJornada(null);pintar()}function ligaTerminada(){if(!C||!C.liga)return false;return[1,2].every(function(d){var L=C.liga[d];return L&&L.jornada>=L.cal.length})}function miLigaTerminada(){if(!C||!C.liga||!C.div)return false;var d=C.div[C.mi];return!!C.liga[d]&&jornadasJugadas(d)>=jornadasDe(d)}function prepararPlayoffs(){if(!C.po||C.po.temp!==C.temp){completarLigas();crearPlayoffs()}avanzarPlayoffs()}function partidoNuevo(et,h,a){return{et,h,a,gh:null,ga:null,jugado:false,oro:null}}function crearPlayoffs(){var t1=tabla(1),t2=tabla(2);if(C.po&&C.po.temp===C.temp){if(!C.po.p2)C.po.p2={directos:[t2[0]?t2[0].id:null,t2[1]?t2[1].id:null],tercero:null,semis:[partidoNuevo("Semifinal 1",t2[2]?t2[2].id:null,t2[5]?t2[5].id:null),partidoNuevo("Semifinal 2",t2[3]?t2[3].id:null,t2[4]?t2[4].id:null)],final:null};return C.po}C.po={temp:C.temp,p1:{primeros:t1[0]?t1[0].id:null,campeon:null,semis:[partidoNuevo("Semifinal 1",t1[1]?t1[1].id:null,t1[4]?t1[4].id:null),partidoNuevo("Semifinal 2",t1[2]?t1[2].id:null,t1[3]?t1[3].id:null)],final:null,finalisima:null},p2:{directos:[t2[0]?t2[0].id:null,t2[1]?t2[1].id:null],tercero:null,semis:[partidoNuevo("Semifinal 1",t2[2]?t2[2].id:null,t2[5]?t2[5].id:null),partidoNuevo("Semifinal 2",t2[3]?t2[3].id:null,t2[4]?t2[4].id:null)],final:null}};guardar();return C.po}function ganadorDe(p){if(!p||!p.jugado||p.gh==null||p.ga==null)return null;return p.gh>=p.ga?p.h:p.a}function avanzarPlayoffs(){var po=C.po;if(!po)return;var t1=tabla(1),p1=po.p1;if(p1&&!p1.final){var g=p1.semis.map(ganadorDe);if(g[0]&&g[1]){var c=casaMejor(g[0],g[1],t1);p1.final=partidoNuevo("Final",c[0],c[1])}}else if(p1&&p1.final&&p1.final.jugado&&!p1.finalisima){p1.finalisima=partidoNuevo("Final\xEDsima",p1.primeros,ganadorDe(p1.final))}else if(p1&&p1.finalisima&&p1.finalisima.jugado&&!p1.campeon&&ganadorDe(p1.finalisima)){p1.campeon=ganadorDe(p1.finalisima)}var t2=tabla(2),p2=po.p2;if(p2&&!p2.final){var _g=p2.semis.map(ganadorDe);if(_g[0]&&_g[1]){var _c=casaMejor(_g[0],_g[1],t2);p2.final=partidoNuevo("Final por el ascenso",_c[0],_c[1])}}else if(p2&&p2.final&&p2.final.jugado&&!p2.tercero&&ganadorDe(p2.final)){p2.tercero=ganadorDe(p2.final)}}function pendientesPlayoff(){var po=C.po,out=[];if(!po)return out;["p1","p2"].forEach(function(k){var b=po[k];if(!b)return;(b.semis||[]).forEach(function(p){if(p&&!p.jugado&&p.h&&p.a)out.push({b:k,p})});if(b.final&&!b.final.jugado&&b.final.h&&b.final.a)out.push({b:k,p:b.final});if(b.finalisima&&!b.finalisima.jugado&&b.finalisima.h&&b.finalisima.a)out.push({b:k,p:b.finalisima})});return out}function playoffTerminado(){var po=C.po;if(!po)return true;return!!(po.p1&&po.p1.campeon)&&!!(po.p2&&po.p2.tercero)}function miPartidoPlayoff(){var po=C.po;if(!po||!C.mi)return null;var lista=pendientesPlayoff();for(var i=0;i<lista.length;i++){var p=lista[i].p;if(p.h===C.mi||p.a===C.mi){var div=lista[i].b==="p1"?1:2;return{p,div,et:p.et+" \xB7 "+DIV[div]}}}return null}function simularPartidoPlayoff(p){var r=partidoOro(p.h,p.a);p.gh=r.gh;p.ga=r.ga;p.jugado=true;p.oro=r.oro||null;p.golesRes=r.goles?r.goles.slice():[];p.stats=r.stats||null;p.tiempoReglamentario=r.tiempoReglamentario||null;if(p.comp==="copa"){}else{registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga")}}function simularPlayoffs(){if(!C.po)crearPlayoffs();var vueltas=0;while(vueltas++<12){var pend=pendientesPlayoff();if(!pend.length)break;pend.forEach(function(x){simularPartidoPlayoff(x.p)});avanzarPlayoffs()}guardar()}function cerrarRondaPlayoff(pendientes,propio){pendientes.forEach(function(x){if(x.p!==propio&&!x.p.jugado)simularPartidoPlayoff(x.p)});avanzarPlayoffs();guardar();vista="inicio";pintar()}function simularRondaPlayoff(){simularRondaPlayoffLocal()}
+function simularRondaPlayoffLocal(){prepararPlayoffs();var pendientes=pendientesPlayoff().slice(),m=miPartidoPlayoff();if(!m){cerrarRondaPlayoff(pendientes,null);hojaResultado('<div class="cr-sheet-h">Playoffs \xB7 resultados de la ronda</div>'+bloquePlayoffs());return}var p=m.p,r=Object.assign(partidoOro(p.h,p.a),{h:p.h,a:p.a,jugado:true});directoSim(p.h,p.a,r,function(){p.gh=r.gh;p.ga=r.ga;p.jugado=true;p.oro=r.oro||null;p.golesRes=(r.goles||[]).slice();p.stats=r.stats||null;p.tiempoReglamentario=r.tiempoReglamentario||null;registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga");cerrarRondaPlayoff(pendientes,p);hojaResultado(detallePartido(r,m.et)+bloquePlayoffs())})}function jugarPlayoff(){jugarPlayoffLocal()}
+function jugarPlayoffLocal(){var m=miPartidoPlayoff();if(!m){simularRondaPlayoffLocal();return}var pendientes=pendientesPlayoff().slice();var p=m.p;motorPartido(p.h,p.a,function(r){if(window.Online179&&Online179.activo()){Online179.resultado("playoff",r,{et:m.p.et,div:m.div,h:p.h,a:p.a});return}var reg=r.tiempoReglamentario||[r.gh,r.ga];var rr=r;p.gh=rr.gh;p.ga=rr.ga;p.jugado=true;p.oro=rr.oro||null;p.golesRes=(rr.goles||[]).slice();p.stats=r.stats||null;p.tiempoReglamentario=reg[0]===reg[1]?reg:null;registrarRacha136(p);anotarGoleadores({goles:p.golesRes},"liga");pendientes.forEach(function(x){if(x.p!==p&&!x.p.jugado)simularPartidoPlayoff(x.p)});avanzarPlayoffs();guardar();jugando=false;try{exitMatch()}catch(e){}vista="inicio";pintar();hojaResultado(detallePartido({h:p.h,a:p.a,gh:p.gh,ga:p.ga,goles:p.golesRes||[],oro:p.oro,stats:p.stats,tiempoReglamentario:p.tiempoReglamentario},p.et+" \xB7 "+DIV[m.div])+bloquePlayoffs())},null,true)}function simularMiCopa(){return simularMiCopaLocal()}
+function simularMiCopaLocal(){var cp=copaPendiente();if(!cp)return null;var ri=C.copa.ronda;var nombreRonda=rondaCopa141(ri);var r=Object.assign(simular(cp.h,cp.a,true),{h:cp.h,a:cp.a});var reg=[r.gh,r.ga];golDeOro(r);r.tiempoReglamentario=reg[0]===reg[1]?reg:null;directoSim(cp.h,cp.a,r,function(){if(window.Online179&&Online179.activo()){Online179.resultado("copa",r,{ri:ri,nombreRonda:nombreRonda,h:cp.h,a:cp.a});return}cerrarMiCopa(cp,r);vista="inicio";pintar();hojaResultado(detallePartido(cp,"Copa Frontier \xB7 "+nombreRonda)+bloqueCopa(ri,true)+bloqueJornada(C.ultimaJornada))});return cp}function jugarYoCopa(){jugarYoCopaLocal()}
 function jugarYoCopaLocal(){if(abierto126()){vista="mercado";pintar();return}var cp=copaPendiente();if(!cp)return;var ri=C.copa.ronda;var nombreRonda=rondaCopa141(ri);jugando=true;montar();$c("#career").classList.remove("is-open");$c("#career").setAttribute("aria-hidden","true");try{Pick.home=cp.h;Pick.away=cp.a}catch(e){}var cerrado=false;finalMotor149=function finalMotor1492(){if(!cerrado&&!C.partidoPendiente149)pendiente149(cp.h,cp.a,resultadoMotor149(cp.h,cp.a),"copa")};function continuar(){if(cerrado)return;cerrado=true;var goles=(M.goles||[]).map(function(x){var e=x.eq===0?cp.h:cp.a;var rr=resolverJugador(e,{num:x.num,largo:x.nombre,nom:x.corto});return{eq:e,jug:x.num||0,pid:rr?rr.p.pid:null,nom:x.corto,largo:x.nombre,cara:x.cara,tec:x.tec,min:x.min,oro:!!x.oro,lado:x.eq===0?"h":"a"}});var r={h:cp.h,a:cp.a,gh:M.marcador[0],ga:M.marcador[1],jugado:true,goles,oro:M.oro||null,tiempoReglamentario:M.reglamentario?M.reglamentario.slice():null,stats:{tiros:M.stats.tiros.slice(),pases:M.stats.pases.slice(),posesion:[Math.round(100*(M.stats.pases[0]+1)/(M.stats.pases[0]+M.stats.pases[1]+2)),0],duelos:M.stats.duelos.slice(),paradas:paradasDe(M.stats)}};r.stats.posesion[1]=100-r.stats.posesion[0];r.golOro=goles.filter(function(g){return g.oro})[0]||null;finalMotor149=null;delete C.partidoPendiente149;if(window.Online179&&Online179.activo()){Online179.resultado("copa",r,{ri:ri,nombreRonda:nombreRonda,h:cp.h,a:cp.a});return}cerrarMiCopa(cp,r);jugando=false;try{exitMatch()}catch(e){}vista="inicio";pintar();hojaResultado(detallePartido(cp,"Copa Frontier \xB7 "+nombreRonda)+bloqueCopa(ri,true)+bloqueJornada(C.ultimaJornada))}function cancelar(){finalMotor149=null;window.__rogueFallback=null;if(cerrado)return;cerrado=true;jugando=false;vista="inicio";pintar()}window.__rogueFallback=function(){if(cerrado)return;if(!sembrarM179(cp.h,cp.a,true))return;continuar()};
   prepararMotorCarrera(cp.h,cp.a,true);if(window.PARTIDO&&PARTIDO.prepararCarrera)PARTIDO.prepararCarrera(continuar,cancelar);launchMatch()}function volverACarrera(){if(!jugando)return;jugando=false;try{exitMatch()}catch(e){}vista="inicio";pintar()}function cerrarTemporadaUI(){if(window.Online179&&Online179.activo()){Online179.puerta("cerrar",{modo:"cerrar"},cerrarTemporadaLocal);return}cerrarTemporadaLocal()}
-function cerrarTemporadaLocal(){var res=cerrarTemporada();vista="mercado";C.preVista=C.temp;guardar();pintar();var b=res.balon;var trofeos=res.trofeosYo||[];var preguntarCambio=function preguntarCambio2(){setTimeout(cambioDeEquipoPregunta,260)};abrirResultadosTemporada(res,preguntarCambio);var preguntarResultados=function preguntarResultados2(){setTimeout(function(){if(typeof window.preguntar!=="function"){preguntarCambio();return}window.preguntar("TEMPORADA "+res.temp+" TERMINADA","\xBFQuieres ver los resultados de la temporada que acaba de terminar (las dos tablas, el campe\xF3n de cada divisi\xF3n, el de la Copa y los goleadores) o pasas ya a la siguiente?","VER RESULTADOS",function(){var t=document.querySelector("#crSheetIn");if(t)t.scrollTop=0},"PASAR A LA SIGUIENTE",function(){cerrarHoja();preguntarCambio()})},300)};var lanzarBalon=function lanzarBalon2(){if(b)animarBalon(b,res.temp,preguntarResultados);else preguntarResultados()};if(trofeos.length){setTimeout(function(){mostrarTrofeos(trofeos,lanzarBalon)},450)}else if(b){setTimeout(lanzarBalon,500)}else{preguntarResultados()}}function mostrarTrofeos(lista,alTerminar){var i=0;function siguiente(){if(i>=lista.length){if(alTerminar)alTerminar();return}var t=lista[i++];animarTrofeo(t,siguiente)}siguiente()}function animarTrofeo(t,alTerminar){var d=document.createElement("div");d.className="cr-trofeo";var confeti=[];for(var k=0;k<26;k++){confeti.push('<i style="left:'+(Math.random()*100).toFixed(1)+"%;animation-delay:"+(Math.random()*.8).toFixed(2)+"s;animation-duration:"+(1.6+Math.random()*1.4).toFixed(2)+"s;background:hsl("+Math.floor(Math.random()*60+35)+',95%,60%)"></i>')}var esCopa=t.tipo==="copa";d.innerHTML='<div class="cr-trofeo-conf">'+confeti.join("")+'</div><div class="cr-trofeo-in"><div class="cr-trofeo-lab">'+(esCopa?"COPA FRONTIER":"LIGA")+" \xB7 "+esc(t.sub||"")+'</div><div class="cr-trofeo-cup" aria-hidden="true">'+(esCopa?'<svg viewBox="0 0 100 100"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset="55%" stop-color="#ffcf2e"/><stop offset="100%" stop-color="#a87600"/></linearGradient></defs><path d="M50 8 L62 30 H38 Z" fill="#ffd21f"/><path d="M30 30h40v10c0 18-9 30-20 36-11-6-20-18-20-36z" fill="url(#cg)"/><path d="M44 76h12v10H44z" fill="#a87600"/><path d="M32 86h36v8H32z" fill="url(#cg)"/></svg>':'<svg viewBox="0 0 100 100"><defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c9"/><stop offset="50%" stop-color="#ffc93a"/><stop offset="100%" stop-color="#96660a"/></linearGradient></defs><path d="M28 12h44v12c0 22-10 34-22 40-12-6-22-18-22-40z" fill="url(#cg2)"/><path d="M22 14h8v14a16 16 0 0 1-8-14zm56 0h-8v14a16 16 0 0 0 8-14z" fill="url(#cg2)"/><path d="M44 64h12v14H44z" fill="#a87600"/><path d="M30 78h40v10H30z" fill="url(#cg2)"/><circle cx="50" cy="34" r="10" fill="#7a4a00" opacity=".55"/></svg>')+'</div><div class="cr-trofeo-txt">'+esc(t.txt)+'</div><div class="cr-trofeo-eq"><img src="'+b64escudo(C.mi)+'" alt="">'+esc(nombre(C.mi))+'</div><button class="cr-btn cr-btn--main cr-trofeo-x" type="button">\xA1Vamos!</button></div>';document.body.appendChild(d);requestAnimationFrame(function(){d.classList.add("is-on")});var cerrar2=function cerrar3(){d.remove();if(alTerminar)alTerminar()};d.querySelector(".cr-trofeo-x").addEventListener("click",cerrar2);setTimeout(function(){if(d.parentNode)cerrar2()},6500)}function animarBalon(b,temp,alCerrar){var d=document.createElement("div");d.className="cr-balon";d.innerHTML='<div class="cr-balon-stars"></div><div class="cr-balon-in"><div class="cr-balon-lab">BAL\xD3N DE ORO \xB7 TEMPORADA '+temp+'</div><div class="cr-balon-ball" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="url(#bg)"/><defs><radialGradient id="bg" cx="35%" cy="30%"><stop offset="0" stop-color="#fff6c0"/><stop offset="55%" stop-color="#f5c518"/><stop offset="100%" stop-color="#8a5b00"/></radialGradient></defs><path d="M50 22 L68 35 L61 56 L39 56 L32 35 Z" fill="#7a4a00" opacity=".85"/><path d="M50 78 L38 68 L42 58 L58 58 L62 68 Z" fill="#7a4a00" opacity=".7"/></svg></div><div class="cr-balon-pic">'+(CARAS[b.cara]?'<img src="'+CARAS[b.cara]+'" alt="">':"")+'</div><div class="cr-balon-nom">'+esc(b.nom)+'</div><div class="cr-balon-eq"><img src="'+b64escudo(b.eq)+'" alt="">'+esc(nombre(b.eq))+'</div><div class="cr-balon-gol">'+b.liga+" goles en liga \xB7 "+b.copa+" en copa \xB7 <b>"+(b.liga+b.copa)+'</b></div><button class="cr-btn cr-btn--main cr-balon-x" type="button">Continuar</button></div>';document.body.appendChild(d);requestAnimationFrame(function(){d.classList.add("is-on")});d.querySelector(".cr-balon-x").addEventListener("click",function(){d.remove();if(typeof alCerrar==="function")setTimeout(alCerrar,220)})}function abrirSelector(modo179){var el2=document.getElementById("careerPick");if(!el2){el2=document.createElement("section");el2.id="careerPick";el2.className="careerPick";el2.innerHTML='<div class="cp-wrap"><header class="cp-head"><b>MODO CARRERA</b><span>Elige tu equipo: los '+IDS.length+', del mejor al peor. Empiezas en la divisi\xF3n que te toque por media.</span><button class="cr-x" id="cpX" type="button">\u2715</button></header><div class="cp-body"><div class="cp-grid" id="cpGrid"></div><div class="cp-side" id="cpSide"></div></div></div>';document.body.appendChild(el2);el2.querySelector("#cpX").addEventListener("click",function(){el2.classList.remove("is-open")})}var grid=el2.querySelector("#cpGrid");grid.innerHTML="<p>Elige equipo\u2026</p>";el2.classList.add("is-open");var side=el2.querySelector("#cpSide");side.innerHTML='<div class="cp-hint">'+(modo179&&modo179.aviso?modo179.aviso:"Toca un escudo para ver la plantilla y empezar.<br><br><b style=\"color:#ffd21f\">"+IDS.length+" clubes</b>, 11 en Primera y 11 en Segunda: los que m\xE1s media tienen juegan arriba.")+"</div>";var lista=IDS.slice().sort(function(a,b){return mediaEq(b)-mediaEq(a)||(nombre(a)<nombre(b)?-1:1)});grid.innerHTML=lista.map(function(id,i){var m=mediaEq(id);return'<button class="cp-team'+(m>=84?" is-top":"")+(modo179&&modo179.prohibido&&modo179.prohibido.indexOf(id)>=0?" is-off":"")+'" data-pick="'+id+'"><em class="cp-rank">#'+(i+1)+'</em><img src="'+b64escudo(id)+'" alt=""><b>'+esc(nombre(id))+'</b><span class="cp-media">media '+m+"</span></button>"}).join("");Array.prototype.forEach.call(grid.querySelectorAll("[data-pick]"),function(b){b.addEventListener("click",function(){if(modo179&&modo179.prohibido&&modo179.prohibido.indexOf(b.dataset.pick)>=0){var tv179=typeof window.toast==="function"?window.toast:null;if(tv179)tv179("Ese equipo ya lo lleva tu rival",2200);return}Array.prototype.forEach.call(grid.querySelectorAll(".cp-team"),function(x){x.classList.remove("is-on")});b.classList.add("is-on");var id=b.dataset.pick;var pl=plantilla(id);side.innerHTML='<div class="cp-head2"><img src="'+b64escudo(id)+'" alt=""><div><b>'+esc(nombre(id))+"</b><span>"+(C&&C.div[id]?DIV[C.div[id]]+" \xB7 ":"")+"media "+mediaEq(id)+'</span></div></div><div class="cp-list">'+pl.map(function(p){return'<div class="cp-p">'+(CARAS[p.cara]?'<img src="'+CARAS[p.cara]+'" alt="">':"")+"<span><b>"+esc(p.n)+"</b><i>"+p.pos+"</i></span><em>"+p.med+"</em></div>"}).join("")+'</div><button class="cr-btn cr-btn--main" id="cpGo" type="button">Empezar carrera con '+esc(corto(id))+"</button>";side.querySelector("#cpGo").addEventListener("click",function(){if(modo179&&typeof modo179.alElegir==="function")modo179.alElegir(id);else empezar(id)});if(window.innerWidth<=860){try{side.scrollIntoView({block:"start",behavior:"smooth"})}catch(e){el2.scrollTop=el2.scrollHeight}}})})}function empezar(id){C=nuevoEstado(id);generarTemporada();var reg=mercadoPretemporada();guardar();var pk=document.getElementById("careerPick");if(pk)pk.classList.remove("is-open");vista="mercado";C.preVista=C.temp;if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera();pintar()}function cambioDeEquipoPregunta(){if(!C)return;if(typeof window.preguntar!=="function")return;var yo=C.mi;window.preguntar("\xBFCAMBIAS DE EQUIPO?","La temporada "+C.temp+" ya est\xE1 lista. Puedes seguir con "+nombre(yo)+" ("+DIV[C.div[yo]]+") o ponerte al mando de otro equipo: empezar\xE1s en la divisi\xF3n en la que est\xE9 ahora mismo.","CAMBIAR DE EQUIPO",abrirCambioEquipo,"SEGUIR CON "+String(corto(yo)).toUpperCase())}function abrirCambioEquipo(){if(!C)return;var yo=C.mi;var lista=IDS.slice().sort(function(a,b){return mediaEq(b)-mediaEq(a)||(nombre(a)<nombre(b)?-1:1)});var html='<div class="cr-sheet-h">Cambiar de equipo \xB7 temporada '+C.temp+"</div>";html+='<div class="cr-note cr-note--pre">Elige con qu\xE9 equipo juegas esta temporada. Empiezas en la divisi\xF3n en la que est\xE9 ahora mismo; las plantillas y los fichajes del verano se quedan como est\xE1n.</div>';html+='<div class="cp-grid cp-grid--cambio">';lista.forEach(function(id){var m=mediaEq(id);html+='<button class="cp-team'+(id===yo?" is-on":"")+(m>=84?" is-top":"")+'" type="button" data-cambio="'+id+'"><img src="'+b64escudo(id)+'" alt=""><b>'+esc(nombre(id))+'</b><span class="cp-media">media '+m+" \xB7 "+["","1\xAA","2\xAA"][C.div[id]]+"</span></button>"});html+="</div>";abrirHoja(html);var caja=$c("#crSheetIn");Array.prototype.forEach.call(caja.querySelectorAll("[data-cambio]"),function(b){b.addEventListener("click",function(){cambiarMiEquipo(b.dataset.cambio)})})}function cambiarMiEquipo(id){if(!C||IDS.indexOf(id)<0)return;var antes=C.mi;cerrarHoja();if(id===antes)return;C.mi=id;cuentas126();ofertas126();vista=esPretemporada()?"mercado":"inicio";guardar();pintar();if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera();var aviso3=typeof window.toast==="function"?window.toast:typeof toast==="function"?toast:null;if(aviso3)aviso3("Ahora llevas "+nombre(id)+" \xB7 "+DIV[C.div[id]],2600)}function abrir(){if(SLOT179!==""){fijarSlot179("",function(){abrir()});return}if(!dbLista149){avisoGuardado149("Recuperando el \xFAltimo guardado del dispositivo\u2026");lista149.then(function(){avisoGuardado149("");abrir()});return}C=_cargar();if(!C){abrirSelector();return}cuentas126();guardar();if(C.golVer!==2)reconstruirGoleadores();if(esPretemporada()){if(!(C.mercado||[]).some(function(r){return r&&r.temp===C.temp})){try{mercadoPretemporada()}catch(e){}}C.preVista=C.temp;guardar();vista="mercado"}else{vista="inicio"}pintar()}function cerrar(){guardarFinal149();if(C)guardar(false,true);if(SLOT179==="online")fijarSlot179("");var c=document.getElementById("career");if(c){c.classList.remove("is-open");c.setAttribute("aria-hidden","true")}if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera()}function borrar(){try{localStorage.removeItem(KEY);localStorage.removeItem(KEY_RESPALDO);localStorage.removeItem(KEY_ACTUAL149);KEYS_VIEJAS.forEach(function(k){localStorage.removeItem(k)})}catch(e){}generacion149++;ultimoPunto149=null;espejoUltimo149=null;ultimoIntento149=null;C=null;IDS=TODOS_IDS.slice();baseTexto149=null;idbTexto149=null;finalMotor149=null;if(db149){try{db149.transaction("partidas","readwrite").objectStore("partidas").delete(IDB_CLAVE179)}catch(e){}}if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera()}return{abrir,cerrar,borrar,hay:hayCarrera,listo149:lista149,guardarFinal149,nueva:function nueva(){if(SLOT179!==""){fijarSlot179("",function(){Carrera.nueva()});return}if(!dbLista149){lista149.then(function(){borrar();abrirSelector()});return}borrar();abrirSelector()},_estado:function _estado(){return C},copia:{codigo:function codigo(){return C?codigoPartida():null},restaurar:function restaurar(t){return restaurarDesde(t)},respaldo:function respaldo(){return restaurarRespaldo()},esquema:function esquema(){return ESQ}},_depurar:{calcularMercado155,guardar,recuperarPartido149,pendiente149,retiradoRedux148,retirarRedux148,baseDefensiva146,evolucionarMedias,detalleJugador143:detalleJugador,cargar:function cargar(){C=_cargar();return C},ids:function ids(){return IDS.slice()},rondaCopa:rondaCopa141,fechasCopa:fechasCopa141,mercado126:{rico151,buscarMejora147,plan147:planVenta147,cuotas:cuotas136,formacion:formacion136,registrarRacha:registrarRacha136,racha:rachaHTML136,prepararMotor:prepararMotorCarrera,minimoLibre:minimoLibre135,soltar:soltar126,venderDirecto:venderDirecto134,compradorDirecto:compradorVenta134,receptorExcedente:receptorExcedente133,planVenta:planVenta132,contar:contar126,ajustar:ajustarOnce131,vacante:vacante131,salidas:salidas131,bloqueado:fichado130,ofertas:ofertas126,alineacion:alineacion126,cuentas:cuentas126,abierto:abierto126,rango:rango126,valor:valor126,precio:precio126,importante:importante126,comprar:comprarClub126,libre:contratarLibre126,pasar:pasarDia126,ia:iaDia126,valido:valido126,cobrar:cobrarTemporada126,render:renderMercado126,pendientes:pendientes179,pendiente:pendienteSobre179,abiertas:pendientesAbiertas179,ofrecer:ofrecer179,resolver:resolver179,retirar:retirar179},directo:directoSim,golDeOro,simular,cerrarTemporada,generar:function generar(){C=nuevoEstado(IDS[0]);generarTemporada()},trofeo:function trofeo(t){animarTrofeo(t||{tipo:"liga",txt:"CAMPE\xD3N DE PRIMERA FRONTIER",sub:"Temporada 1"},function(){})},copa:copaPendiente,cerrarCopa:cerrarCopaPendiente,premio:premioIntercambio,plantillaDe:plantilla,resumenVista:abrirResultadosTemporada,prepararPlayoffs,pendientesPlayoff,miPartidoPlayoff,simularRondaPlayoff,pintar,bloquePlayoffs,bloqueJornada,hojaResultado,esc:b64escudo,corto,nombre,golesDeJugador},pintar:pintar,nombre:nombre,corto:corto,hojaResultado:hojaResultado,plantillaDe:plantilla,esc:b64escudo,nuevaCon:function nuevaCon(id){if(!dbLista149){lista149.then(function(){borrar();empezar(id)});return}borrar();empezar(id)},fijarSlot:fijarSlot179,hayEn:hayEn179,slot:function slot179(){return SLOT179},humanos:function humanos179b(arr){if(arr!==undefined)HUMANOS179=arr&&arr.length?arr.slice():null;return HUMANOS179?HUMANOS179.slice():null},exportar:exportar179,importar:importar179,elegirEquipo:function elegirEquipo179(modo){abrirSelector(modo)},cerrarCopas:cerrarCopas179,cerrarPlayoffs:cerrarPlayoffs179,terminarJornada:terminarJornada179,hojaJornada:hojaJornada179,pendienteDe:pendienteDe179,simularPendiente:simularPendiente179,hojaCopa:hojaCopa179,hojaPlayoff:hojaPlayoff179,cambioEquipoPregunta:cambioDeEquipoPregunta,temporadaCerrada:function temporadaCerrada179(){vista="mercado";C.preVista=C.temp;guardar();pintar()},_on:{abierto:abierto126,proximoPartido:proximoPartido,miLigaTerminada:miLigaTerminada,copa:copaPendiente,playoff:miPartidoPlayoff,jugando:function jugando179b(){return jugando},vista:function vista179b(){return vista},fijarVista:function fijarVista179(v){vista=v},resumen:function resumen179(t,m){resumenFichajes129(t,m)},cerrarHoja:cerrarHoja}}})();try{window.Carrera=Carrera}catch(e){}})();
+function cerrarTemporadaLocal(){var res=cerrarTemporada();vista="mercado";C.preVista=C.temp;guardar();pintar();var b=res.balon;var trofeos=res.trofeosYo||[];var preguntarCambio=function preguntarCambio2(){setTimeout(cambioDeEquipoPregunta,260)};abrirResultadosTemporada(res,preguntarCambio);var preguntarResultados=function preguntarResultados2(){setTimeout(function(){if(typeof window.preguntar!=="function"){preguntarCambio();return}window.preguntar("TEMPORADA "+res.temp+" TERMINADA","\xBFQuieres ver los resultados de la temporada que acaba de terminar (las dos tablas, el campe\xF3n de cada divisi\xF3n, el de la Copa y los goleadores) o pasas ya a la siguiente?","VER RESULTADOS",function(){var t=document.querySelector("#crSheetIn");if(t)t.scrollTop=0},"PASAR A LA SIGUIENTE",function(){cerrarHoja();preguntarCambio()})},300)};var lanzarBalon=function lanzarBalon2(){if(b)animarBalon(b,res.temp,preguntarResultados);else preguntarResultados()};if(trofeos.length){setTimeout(function(){mostrarTrofeos(trofeos,lanzarBalon)},450)}else if(b){setTimeout(lanzarBalon,500)}else{preguntarResultados()}}function mostrarTrofeos(lista,alTerminar){var i=0;function siguiente(){if(i>=lista.length){if(alTerminar)alTerminar();return}var t=lista[i++];animarTrofeo(t,siguiente)}siguiente()}function animarTrofeo(t,alTerminar){var d=document.createElement("div");d.className="cr-trofeo";var confeti=[];for(var k=0;k<26;k++){confeti.push('<i style="left:'+(Math.random()*100).toFixed(1)+"%;animation-delay:"+(Math.random()*.8).toFixed(2)+"s;animation-duration:"+(1.6+Math.random()*1.4).toFixed(2)+"s;background:hsl("+Math.floor(Math.random()*60+35)+',95%,60%)"></i>')}var esCopa=t.tipo==="copa";d.innerHTML='<div class="cr-trofeo-conf">'+confeti.join("")+'</div><div class="cr-trofeo-in"><div class="cr-trofeo-lab">'+(esCopa?"COPA FRONTIER":"LIGA")+" \xB7 "+esc(t.sub||"")+'</div><div class="cr-trofeo-cup" aria-hidden="true">'+(esCopa?'<svg viewBox="0 0 100 100"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset="55%" stop-color="#ffcf2e"/><stop offset="100%" stop-color="#a87600"/></linearGradient></defs><path d="M50 8 L62 30 H38 Z" fill="#ffd21f"/><path d="M30 30h40v10c0 18-9 30-20 36-11-6-20-18-20-36z" fill="url(#cg)"/><path d="M44 76h12v10H44z" fill="#a87600"/><path d="M32 86h36v8H32z" fill="url(#cg)"/></svg>':'<svg viewBox="0 0 100 100"><defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c9"/><stop offset="50%" stop-color="#ffc93a"/><stop offset="100%" stop-color="#96660a"/></linearGradient></defs><path d="M28 12h44v12c0 22-10 34-22 40-12-6-22-18-22-40z" fill="url(#cg2)"/><path d="M22 14h8v14a16 16 0 0 1-8-14zm56 0h-8v14a16 16 0 0 0 8-14z" fill="url(#cg2)"/><path d="M44 64h12v14H44z" fill="#a87600"/><path d="M30 78h40v10H30z" fill="url(#cg2)"/><circle cx="50" cy="34" r="10" fill="#7a4a00" opacity=".55"/></svg>')+'</div><div class="cr-trofeo-txt">'+esc(t.txt)+'</div><div class="cr-trofeo-eq"><img src="'+b64escudo(C.mi)+'" alt="">'+esc(nombre(C.mi))+'</div><button class="cr-btn cr-btn--main cr-trofeo-x" type="button">\xA1Vamos!</button></div>';document.body.appendChild(d);requestAnimationFrame(function(){d.classList.add("is-on")});var cerrar2=function cerrar3(){d.remove();if(alTerminar)alTerminar()};d.querySelector(".cr-trofeo-x").addEventListener("click",cerrar2);setTimeout(function(){if(d.parentNode)cerrar2()},6500)}function animarBalon(b,temp,alCerrar){var d=document.createElement("div");d.className="cr-balon";d.innerHTML='<div class="cr-balon-stars"></div><div class="cr-balon-in"><div class="cr-balon-lab">BAL\xD3N DE ORO \xB7 TEMPORADA '+temp+'</div><div class="cr-balon-ball" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="url(#bg)"/><defs><radialGradient id="bg" cx="35%" cy="30%"><stop offset="0" stop-color="#fff6c0"/><stop offset="55%" stop-color="#f5c518"/><stop offset="100%" stop-color="#8a5b00"/></radialGradient></defs><path d="M50 22 L68 35 L61 56 L39 56 L32 35 Z" fill="#7a4a00" opacity=".85"/><path d="M50 78 L38 68 L42 58 L58 58 L62 68 Z" fill="#7a4a00" opacity=".7"/></svg></div><div class="cr-balon-pic">'+(CARAS[b.cara]?'<img src="'+CARAS[b.cara]+'" alt="">':"")+'</div><div class="cr-balon-nom">'+esc(b.nom)+'</div><div class="cr-balon-eq"><img src="'+b64escudo(b.eq)+'" alt="">'+esc(nombre(b.eq))+'</div><div class="cr-balon-gol">'+b.liga+" goles en liga \xB7 "+b.copa+" en copa \xB7 <b>"+(b.liga+b.copa)+'</b></div><button class="cr-btn cr-btn--main cr-balon-x" type="button">Continuar</button></div>';document.body.appendChild(d);requestAnimationFrame(function(){d.classList.add("is-on")});d.querySelector(".cr-balon-x").addEventListener("click",function(){d.remove();if(typeof alCerrar==="function")setTimeout(alCerrar,220)})}function abrirSelector(modo179){var el2=document.getElementById("careerPick");if(!el2){el2=document.createElement("section");el2.id="careerPick";el2.className="careerPick";el2.innerHTML='<div class="cp-wrap"><header class="cp-head"><b>MODO CARRERA</b><span>Elige tu equipo: los '+IDS.length+', del mejor al peor. Empiezas en la divisi\xF3n que te toque por media.</span><button class="cr-x" id="cpX" type="button">\u2715</button></header><div class="cp-body"><div class="cp-grid" id="cpGrid"></div><div class="cp-side" id="cpSide"></div></div></div>';document.body.appendChild(el2);el2.querySelector("#cpX").addEventListener("click",function(){el2.classList.remove("is-open")})}var grid=el2.querySelector("#cpGrid");grid.innerHTML="<p>Elige equipo\u2026</p>";el2.classList.add("is-open");var side=el2.querySelector("#cpSide");side.innerHTML='<div class="cp-hint">'+(modo179&&modo179.aviso?modo179.aviso:"Toca un escudo para ver la plantilla y empezar.<br><br><b style=\"color:#ffd21f\">"+IDS.length+" clubes</b>, 11 en Primera y 11 en Segunda: los que m\xE1s media tienen juegan arriba.")+"</div>";var lista=IDS.slice().sort(function(a,b){return mediaEq(b)-mediaEq(a)||(nombre(a)<nombre(b)?-1:1)});grid.innerHTML=lista.map(function(id,i){var m=mediaEq(id);return'<button class="cp-team'+(m>=84?" is-top":"")+(modo179&&modo179.prohibido&&modo179.prohibido.indexOf(id)>=0?" is-off":"")+'" data-pick="'+id+'"><em class="cp-rank">#'+(i+1)+'</em><img src="'+b64escudo(id)+'" alt=""><b>'+esc(nombre(id))+'</b><span class="cp-media">media '+m+"</span></button>"}).join("");Array.prototype.forEach.call(grid.querySelectorAll("[data-pick]"),function(b){b.addEventListener("click",function(){if(modo179&&modo179.prohibido&&modo179.prohibido.indexOf(b.dataset.pick)>=0){var tv179=typeof window.toast==="function"?window.toast:null;if(tv179)tv179("Ese equipo ya lo lleva tu rival",2200);return}Array.prototype.forEach.call(grid.querySelectorAll(".cp-team"),function(x){x.classList.remove("is-on")});b.classList.add("is-on");var id=b.dataset.pick;var pl=plantilla(id);side.innerHTML='<div class="cp-head2"><img src="'+b64escudo(id)+'" alt=""><div><b>'+esc(nombre(id))+"</b><span>"+(C&&C.div[id]?DIV[C.div[id]]+" \xB7 ":"")+"media "+mediaEq(id)+'</span></div></div><div class="cp-list">'+pl.map(function(p){return'<div class="cp-p">'+(CARAS[p.cara]?'<img src="'+CARAS[p.cara]+'" alt="">':"")+"<span><b>"+esc(p.n)+"</b><i>"+p.pos+"</i></span><em>"+p.med+"</em></div>"}).join("")+'</div><button class="cr-btn cr-btn--main" id="cpGo" type="button">Empezar carrera con '+esc(corto(id))+"</button>";side.querySelector("#cpGo").addEventListener("click",function(){if(modo179&&typeof modo179.alElegir==="function")modo179.alElegir(id);else empezar(id)});if(window.innerWidth<=860){try{side.scrollIntoView({block:"start",behavior:"smooth"})}catch(e){el2.scrollTop=el2.scrollHeight}}})})}function empezar(id){C=nuevoEstado(id);generarTemporada();var reg=mercadoPretemporada();guardar();var pk=document.getElementById("careerPick");if(pk)pk.classList.remove("is-open");vista="mercado";C.preVista=C.temp;if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera();pintar()}function cambioDeEquipoPregunta(){if(!C)return;if(typeof window.preguntar!=="function")return;var yo=C.mi;window.preguntar("\xBFCAMBIAS DE EQUIPO?","La temporada "+C.temp+" ya est\xE1 lista. Puedes seguir con "+nombre(yo)+" ("+DIV[C.div[yo]]+") o ponerte al mando de otro equipo: empezar\xE1s en la divisi\xF3n en la que est\xE9 ahora mismo.","CAMBIAR DE EQUIPO",abrirCambioEquipo,"SEGUIR CON "+String(corto(yo)).toUpperCase())}function abrirCambioEquipo(){if(!C)return;var yo=C.mi;var lista=IDS.slice().sort(function(a,b){return mediaEq(b)-mediaEq(a)||(nombre(a)<nombre(b)?-1:1)});var html='<div class="cr-sheet-h">Cambiar de equipo \xB7 temporada '+C.temp+"</div>";html+='<div class="cr-note cr-note--pre">Elige con qu\xE9 equipo juegas esta temporada. Empiezas en la divisi\xF3n en la que est\xE9 ahora mismo; las plantillas y los fichajes del verano se quedan como est\xE1n.</div>';html+='<div class="cp-grid cp-grid--cambio">';lista.forEach(function(id){var m=mediaEq(id);html+='<button class="cp-team'+(id===yo?" is-on":"")+(m>=84?" is-top":"")+'" type="button" data-cambio="'+id+'"><img src="'+b64escudo(id)+'" alt=""><b>'+esc(nombre(id))+'</b><span class="cp-media">media '+m+" \xB7 "+["","1\xAA","2\xAA"][C.div[id]]+"</span></button>"});html+="</div>";abrirHoja(html);var caja=$c("#crSheetIn");Array.prototype.forEach.call(caja.querySelectorAll("[data-cambio]"),function(b){b.addEventListener("click",function(){cambiarMiEquipo(b.dataset.cambio)})})}function cambiarMiEquipo(id){if(!C||IDS.indexOf(id)<0)return;var antes=C.mi;cerrarHoja();if(id===antes)return;C.mi=id;cuentas126();ofertas126();vista=esPretemporada()?"mercado":"inicio";guardar();pintar();if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera();var aviso3=typeof window.toast==="function"?window.toast:typeof toast==="function"?toast:null;if(aviso3)aviso3("Ahora llevas "+nombre(id)+" \xB7 "+DIV[C.div[id]],2600)}function abrirEn(){if(!dbLista149){avisoGuardado149("Recuperando el \xFAltimo guardado del dispositivo\u2026");lista149.then(function(){avisoGuardado149("");abrir()});return}C=_cargar();if(!C){abrirSelector();return}cuentas126();guardar();if(C.golVer!==2)reconstruirGoleadores();if(esPretemporada()){if(!(C.mercado||[]).some(function(r){return r&&r.temp===C.temp})){try{mercadoPretemporada()}catch(e){}}C.preVista=C.temp;guardar();vista="mercado"}else{vista="inicio"}pintar()}// abrir puede tardar un poco si el guardado está en la base de datos, así que
+// se espera a que la partida esté de verdad en memoria antes de seguir
+function abrirSlot179(slot,alAcabar){
+  fijarSlot179(slot,function(){
+    abrirEn();
+    var n=0;
+    (function espera(){
+      if(C||n++>120){try{if(alAcabar)alAcabar()}catch(e){};return}
+      setTimeout(espera,50);
+    })();
+  });
+}
+function abrirOnline(alAcabar){abrirSlot179("online",alAcabar)}
+function abrir(){if(SLOT179!==""){fijarSlot179("",function(){abrirEn()});return}abrirEn()}
+function cerrar(){guardarFinal149();if(C)guardar(false,true);if(SLOT179==="online")fijarSlot179("");var c=document.getElementById("career");if(c){c.classList.remove("is-open");c.setAttribute("aria-hidden","true")}if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera()}function borrar(){try{localStorage.removeItem(KEY);localStorage.removeItem(KEY_RESPALDO);localStorage.removeItem(KEY_ACTUAL149);KEYS_VIEJAS.forEach(function(k){localStorage.removeItem(k)})}catch(e){}generacion149++;ultimoPunto149=null;espejoUltimo149=null;ultimoIntento149=null;C=null;IDS=TODOS_IDS.slice();baseTexto149=null;idbTexto149=null;finalMotor149=null;if(db149){try{db149.transaction("partidas","readwrite").objectStore("partidas").delete(IDB_CLAVE179)}catch(e){}}if(typeof window.refrescarMenuCarrera==="function")window.refrescarMenuCarrera()}return{abrir,abrirOnline,cerrar,borrar,hay:hayCarrera,listo149:lista149,guardarFinal149,nueva:function nueva(){if(SLOT179!==""){fijarSlot179("",function(){Carrera.nueva()});return}if(!dbLista149){lista149.then(function(){borrar();abrirSelector()});return}borrar();abrirSelector()},_estado:function _estado(){return C},copia:{codigo:function codigo(){return C?codigoPartida():null},restaurar:function restaurar(t){return restaurarDesde(t)},respaldo:function respaldo(){return restaurarRespaldo()},esquema:function esquema(){return ESQ}},_depurar:{calcularMercado155,guardar,recuperarPartido149,pendiente149,retiradoRedux148,retirarRedux148,baseDefensiva146,evolucionarMedias,detalleJugador143:detalleJugador,cargar:function cargar(){C=_cargar();return C},ids:function ids(){return IDS.slice()},rondaCopa:rondaCopa141,fechasCopa:fechasCopa141,mercado126:{rico151,buscarMejora147,plan147:planVenta147,cuotas:cuotas136,formacion:formacion136,registrarRacha:registrarRacha136,racha:rachaHTML136,prepararMotor:prepararMotorCarrera,minimoLibre:minimoLibre135,soltar:soltar126,venderDirecto:venderDirecto134,compradorDirecto:compradorVenta134,receptorExcedente:receptorExcedente133,planVenta:planVenta132,contar:contar126,ajustar:ajustarOnce131,vacante:vacante131,salidas:salidas131,bloqueado:fichado130,ofertas:ofertas126,alineacion:alineacion126,cuentas:cuentas126,abierto:abierto126,rango:rango126,valor:valor126,precio:precio126,importante:importante126,comprar:comprarClub126,libre:contratarLibre126,pasar:pasarDia126,ia:iaDia126,valido:valido126,cobrar:cobrarTemporada126,render:renderMercado126,pendientes:pendientes179,pendiente:pendienteSobre179,abiertas:pendientesAbiertas179,ofrecer:ofrecer179,resolver:resolver179,retirar:retirar179},directo:directoSim,golDeOro,simular,cerrarTemporada,generar:function generar(){C=nuevoEstado(IDS[0]);generarTemporada()},trofeo:function trofeo(t){animarTrofeo(t||{tipo:"liga",txt:"CAMPE\xD3N DE PRIMERA FRONTIER",sub:"Temporada 1"},function(){})},copa:copaPendiente,cerrarCopa:cerrarCopaPendiente,premio:premioIntercambio,plantillaDe:plantilla,resumenVista:abrirResultadosTemporada,prepararPlayoffs,pendientesPlayoff,miPartidoPlayoff,simularRondaPlayoff,pintar,bloquePlayoffs,bloqueJornada,hojaResultado,esc:b64escudo,corto,nombre,golesDeJugador},pintar:pintar,nombre:nombre,corto:corto,hojaResultado:hojaResultado,plantillaDe:plantilla,esc:b64escudo,nuevaCon:function nuevaCon(id){if(!dbLista149){lista149.then(function(){borrar();empezar(id)});return}borrar();empezar(id)},fijarSlot:fijarSlot179,hayEn:hayEn179,slot:function slot179(){return SLOT179},humanos:function humanos179b(arr){if(arr!==undefined)HUMANOS179=arr&&arr.length?arr.slice():null;return HUMANOS179?HUMANOS179.slice():null},exportar:exportar179,importar:importar179,elegirEquipo:function elegirEquipo179(modo){abrirSelector(modo)},cerrarCopas:cerrarCopas179,cerrarPlayoffs:cerrarPlayoffs179,terminarJornada:terminarJornada179,hojaJornada:hojaJornada179,pendienteDe:pendienteDe179,simularPendiente:simularPendiente179,hojaCopa:hojaCopa179,hojaPlayoff:hojaPlayoff179,cambioEquipoPregunta:cambioDeEquipoPregunta,temporadaCerrada:function temporadaCerrada179(){vista="mercado";C.preVista=C.temp;guardar();pintar()},_on:{abierto:abierto126,proximoPartido:proximoPartido,miLigaTerminada:miLigaTerminada,copa:copaPendiente,playoff:miPartidoPlayoff,jugando:function jugando179b(){return jugando},vista:function vista179b(){return vista},fijarVista:function fijarVista179(v){vista=v},resumen:function resumen179(t,m){resumenFichajes129(t,m)},cerrarHoja:cerrarHoja}}})();try{window.Carrera=Carrera}catch(e){}})();
 </script>
 <script>(function(){try{if(!window.Carrera&&!window.PARTIDO)return;if(window.__idraftArranqueOK)window.__idraftArranqueOK();document.documentElement.dataset.listo="1";var fb=document.getElementById("fallbackCarga");if(fb&&fb.parentNode)fb.parentNode.removeChild(fb)}catch(e){}})();
 </script>
@@ -2250,7 +2264,7 @@ var Online179=(function(){
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, chunks={}, trozos179=null, tMundo=null, mundoOk179=false, mundoListo=false, reintentarVisible=false, salaLista=false, invitado179=null, selector179=null, selectorAbierto179=false;
+  var transporteForzado=null, silencio179=false, callarHasta179=0, cargando179=false, chunks={}, trozos179=null, tMundo=null, mundoOk179=false, mundoListo=false, reintentarVisible=false, salaLista=false, invitado179=null, selector179=null, selectorAbierto179=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2682,6 +2696,14 @@ var Online179=(function(){
     setTimeout(function(){
       if(estado==="listo")return;
       reintentarVisible=true;
+      // con la partida ya cargada no se bloquea: se sigue jugando y ya se
+      // sincronizará cuando el otro entre
+      if(arrancado){
+        aviso="Todav\xEDa no he podido hablar con tu amigo. Puedes seguir jugando.";
+        silencio179=false;      // si no hay nadie al otro lado, que juegue
+        pintarPanel();
+        return;
+      }
       if(estado!=="error")cambiarEstado("error","No se ha podido conectar. Comprueba que tienes datos y reint\xE9ntalo.");
       pintarPanel();
     },32000);
@@ -2698,9 +2720,13 @@ var Online179=(function(){
   function cambiarEstado(e,txt){
     estado=e;etiqueta=txt||"";
     pintarPanel();
-    // un fallo nunca se queda escondido detras de otra pantalla
+    // un fallo nunca se queda escondido detras de otra pantalla, pero con la
+    // carrera ya en marcha no se le planta el panel delante: se le avisa
     if((e==="error"||e==="caido")&&rol)setTimeout(function(){
-      if(estado==="error"||estado==="caido")abrirPanel();
+      if(estado!=="error"&&estado!=="caido")return;
+      var dicho=false;
+      if(arrancado){try{toast(etiqueta||"Se ha cortado la conexi\xF3n con tu amigo.",3600);dicho=true}catch(e2){}}
+      if(!dicho)abrirPanel();
     },80);
   }
   function listoCanal(){
@@ -2708,7 +2734,10 @@ var Online179=(function(){
     cambiarEstado("listo","Conectados.");
     enviar({t:"hola",club:club||null});
     if(!soyAnfitrion()&&!club)aviso="Esperando a que el anfitrión elija equipo…";
-    if(soyAnfitrion()&&club&&rival)arrancarMundo();
+    if(soyAnfitrion()&&club&&rival){
+      if(arrancado)setTimeout(function(){difundir({tipo:"mundo",club:club})},900);
+      else arrancarMundo();
+    }
     pintarPanel();
   }
 
@@ -2719,14 +2748,16 @@ var Online179=(function(){
       if(soyAnfitrion()){
         if(m.club)rival=m.club;
         enviar({t:"hola",club:club||null});
-        if(club&&rival)arrancarMundo();
+        // si la partida ya estaba empezada, el que llega necesita el mundo
+        if(arrancado&&club&&rival)difundir({tipo:"mundo",club:club});
+        else if(club&&rival)arrancarMundo();
         else if(rival){aviso="Tu amigo est\xE1 eligiendo equipo…";pintarPanel()}
         else{aviso="Tu amigo acaba de entrar. Espera a que elija equipo.";pintarPanel()}
       }else{
         if(m.club){
           rival=m.club;
           if(club)enviar({t:"club",club:club});
-          else{aviso="Conectado. Ahora elige tu equipo.";abrirSelectorInvitado(m.club);pintarPanel()}
+          else if(selector179!==m.club){selector179=m.club;aviso="Conectado. Ahora elige tu equipo.";abrirSelectorInvitado(m.club);pintarPanel()}
         }else{aviso="Esperando a que el anfitrión elija equipo…";pintarPanel()}
       }
       return;
@@ -2758,28 +2789,53 @@ var Online179=(function(){
 
   function alMundo(m){
     var c=Car();
+    if(cargando179)return;      // todavía estoy abriendo la mía: que insista
     importando=true;
     var ok=false;try{ok=c&&c.importar(m.txt,club)}catch(e){ok=false}
     importando=false;
     ultimoSello=m.txt||"";
+    callarHasta179=Date.now()+1500;
+    aceptarSello();
     if(!ok){cambiarEstado("error","No se ha podido cargar la partida.");return}
+    arrancado=true;mundoListo=true;   // el invitado ya está dentro: que viva
     mundoOk179=true;
+    silencio179=false;          // ya tengo el mundo bueno: puedo hablar
     try{enviar({t:"mundoOk"})}catch(e){}
     club=club||m.rival;
     try{c.humanos([m.club,club].filter(Boolean))}catch(e){}
     cambiarEstado("listo","Conectados.");
     aviso="";
-    try{c._on.fijarVista("mercado");c.pintar()}catch(e){}
+    abrirHoja179();
+    try{var w0=c._estado().economia.ventana;c._on.fijarVista(w0.cerrado?"inicio":"mercado");c.pintar()}catch(e){}
     aceptarSello();
+    try{c.guardar()}catch(e){} // su copia: así puede volver a entrar solo
+    guardarSala179();          // el invitado también: así puede volver a entrar
     cerrarPanel();
     repinta179();
     try{toast("Ya estás dentro: llevas "+c.nombre(club),3200)}catch(e){}
   }
 
   /* ---------------- puesta en marcha ---------------- */
+  // se apunta el número de la sala y con qué equipo juega cada uno, para
+  // poder volver a entrar en la misma partida otro día
+  function guardarSala179(){
+    try{
+      if(!sala||!club||!rival)return;
+      localStorage.setItem("idraft179.sala",JSON.stringify({s:sala,r:rol,c:club,v:rival}));
+    }catch(e){}
+  }
+  function salaGuardada(){
+    try{
+      var t=localStorage.getItem("idraft179.sala");if(!t)return null;
+      var o=JSON.parse(t);
+      return (o&&o.s&&o.c&&o.v)?o:null;
+    }catch(e){return null}
+  }
+  function borrarSala179(){try{localStorage.removeItem("idraft179.sala")}catch(e){}}
   function arrancarMundo(){
     var c=Car();if(!c||!club||!rival||arrancado)return;
     arrancado=true;
+    guardarSala179();
     var clubes=[club,rival];
     c.fijarSlot("online",function(){
       c.humanos(clubes);
@@ -2849,6 +2905,9 @@ var Online179=(function(){
   }
   function nota179(){
     if(!activo())return;
+    if(!arrancado)return;
+    if(silencio179)return;      // acaba de volver a entrar: que hable el otro
+    if(Date.now()<callarHasta179)return;   // acabo de recibirla: no la devuelvo
     if(importando)return;
     var c=Car();
     try{if(c&&c._on&&c._on.jugando&&c._on.jugando())return}catch(e){}
@@ -2863,13 +2922,21 @@ var Online179=(function(){
       difundir({tipo:"op"});
     },500);
   }
-  function aceptarSello(){setTimeout(function(){var c=Car();try{if(c)ultimoSello=c.exportar()}catch(e){}},700)}
+  function aceptarSello(){
+    var f=function(){var c=Car();try{if(c)ultimoSello=c.exportar()}catch(e){}};
+    f();                       // en el momento: si no, parece que algo cambió
+    setTimeout(f,700);         // y otra vez por si la carrera termina de pintar
+  }
   function alEstado(m){
     var c=Car();if(!c)return;
+    if(!arrancado)return;
+    if(cargando179)return;
     importando=true;
     var ok=false;try{ok=c.importar(m.txt,club)}catch(e){ok=false}
     importando=false;
     ultimoSello=m.txt||"";
+    callarHasta179=Date.now()+1500;
+    aceptarSello();
     if(!ok){aviso="No se ha podido sincronizar la partida.";pintarPanel();return}
     if(m.tipo==="dia"){
       try{
@@ -2888,7 +2955,7 @@ var Online179=(function(){
     }else if(m.tipo==="fin"){
       hojaInvitado(m.paso);
     }else{
-      try{c.pintar()}catch(e){}
+      try{var w1=c._estado().economia.ventana;if(w1.cerrado)c._on.fijarVista("inicio");c.pintar()}catch(e){}
     }
     aceptarSello();
     repinta179();
@@ -2898,14 +2965,31 @@ var Online179=(function(){
   /* ---------------- puertas 1/2 ---------------- */
   function reset(paso){puertas[paso]={yo:false,el:false,modoYo:null,modoEl:null,ejecutar:null,hecho:false,resMio:null,resSuyo:null}}
   function P0(paso){return puertas[paso]||(puertas[paso]={yo:false,el:false,modoYo:null,modoEl:null,ejecutar:null,hecho:false,resMio:null,resSuyo:null})}
+  // el aviso puede perderse por el camino: se vuelve a mandar un par de
+  // veces para que la puerta no se quede cerrada a medias
+  function reintentaListo(paso){
+    [3000,7000,12000].forEach(function(ms){
+      setTimeout(function(){
+        var Q=puertas[paso];
+        if(!Q||!Q.yo||Q.el||Q.hecho||!activo())return;
+        enviar({t:"listo",paso:paso,modo:Q.modoYo||"jugar"});
+      },ms);
+    });
+  }
   function puerta(paso,datos,ejecutar,boton){
     if(!activo()){if(ejecutar)ejecutar();return}
     var P=P0(paso);
+    if(P.hecho&&!PERSONALES[paso])reset(paso);
     if(P.hecho)return;
-    if(P.yo){if(boton)marcar(boton,paso);return}
+    if(P.yo){
+      if(!P.el&&!P.hecho)enviar({t:"listo",paso:paso,modo:P.modoYo||"jugar"});
+      if(boton)marcar(boton,paso);
+      return;
+    }
     P.yo=true;P.modoYo=(datos&&datos.modo)||"jugar";P.ejecutar=ejecutar||null;
     aviso=textoEspera(paso);
     enviar({t:"listo",paso:paso,modo:P.modoYo});
+    reintentaListo(paso);
     repinta179();
     if(P.el)abrir(paso);
   }
@@ -2926,7 +3010,17 @@ var Online179=(function(){
     P.hecho=true;
     var f=P.ejecutar;P.ejecutar=null;
     aviso="";
-    if(f&&(PERSONALES[paso]||soyAnfitrion())){try{f()}catch(e){}}
+    if(f&&(PERSONALES[paso]||soyAnfitrion())){
+      try{f()}catch(e){}
+      // avanzar de día o cerrar temporada lo hace el anfitrión: hay que
+      // mandárselo al otro o cada uno se queda en un sitio distinto
+      if(!PERSONALES[paso]){
+        setTimeout(function(){reset(paso)},1500);
+        setTimeout(function(){
+          if(activo())difundir({tipo:"op"});
+        },700);
+      }
+    }
     if(soyAnfitrion()){
       if(paso==="cerrar"){setTimeout(function(){reset("cerrar");difundir({tipo:"cerrar"})},80)}
       else if(PERSONALES[paso]){
@@ -3094,6 +3188,15 @@ var Online179=(function(){
   }
 
   /* ---------------- panel ---------------- */
+  // la música del menú suena igual que en la carrera de siempre; si estamos
+  // en medio de un partido, manda la del partido y no se toca nada
+  function musicaMenu179(){
+    try{
+      if(!window.Sfx||!Sfx.menu)return;
+      if(window.BGM&&BGM._estado&&BGM._estado().modo==="partido")return;
+      Sfx.menu(true);
+    }catch(e){}
+  }
   function panel(){
     var d=document.getElementById("onl179");
     if(d)return d;
@@ -3106,7 +3209,63 @@ var Online179=(function(){
     return d;
   }
   function cerrarPanel(){var d=document.getElementById("onl179");if(d){d.classList.remove("is-on");d.setAttribute("aria-hidden","true")}}
-  function abrirPanel(){var d=panel();d.classList.add("is-on");d.setAttribute("aria-hidden","false");pintarPanel()}
+  // abrir la hoja de la carrera sin cargar nada: para cuando la partida
+  // llega del otro y no hace falta abrir la nuestra
+  function abrirHoja179(){
+    try{
+      var h=document.getElementById("career");
+      if(h){h.classList.add("is-open");h.setAttribute("aria-hidden","false")}
+    }catch(e){}
+  }
+  // seguir la partida online donde se dejó, sin pedir nada al jugador.
+  // El anfitrión es el que manda: abre la suya y se la pasa al otro. El
+  // invitado espera la del anfitrión, que es la buena; si no aparece, abre
+  // la suya para poder seguir jugando igualmente.
+  function terminar179(){
+    var c2=Car();
+    try{if(c2&&c2.humanos)c2.humanos([club,rival].filter(Boolean))}catch(e){}
+    arrancado=true;mundoListo=true;
+    cambiarEstado("listo","Conectados.");
+    aviso="Buscando a tu amigo para seguir la partida…";
+    conectar();
+    vigilarConexion();
+    try{toast("Partida recuperada: sigues con "+(c2?c2.nombre(club):""),3200)}catch(e){}
+  }
+  function abrirMiPartida179(){
+    var c=Car();if(!c)return;
+    cargando179=true;
+    c.abrirOnline(function(){
+      cargando179=false;
+      terminar179();
+    });
+  }
+  function continuar179(){
+    var g=salaGuardada(), c=Car();
+    if(!g||!c||!c.hayEn||!c.hayEn("online")){abrirPanel();return}
+    rol=g.r;sala=g.s;club=g.c;rival=g.v;
+    musicaMenu179();
+    cambiarEstado("conectando","Recuperando tu partida…");
+    if(soyAnfitrion()){
+      abrirMiPartida179();
+    }else{
+      // el invitado espera la partida del anfitrión: si abriese la suya,
+      // al abrirla se regenera el mercado y le pisa lo que acaba de llegar
+      try{c.fijarSlot("online",function(){})}catch(e){}
+      arrancado=true;mundoListo=true;silencio179=true;
+      aviso="Buscando a tu amigo para seguir la partida…";
+      conectar();
+      vigilarConexion();
+      // si su amigo no aparece, tira con la suya y a jugar
+      setTimeout(function(){
+        if(activo()&&!mundoOk179)abrirMiPartida179();
+      },9000);
+    }
+  }
+  function abrirOnline179(){
+    if(!activo()&&salaGuardada()&&Car()&&Car().hayEn&&Car().hayEn("online")){continuar179();return}
+    abrirPanel();
+  }
+  function abrirPanel(){musicaMenu179();var d=panel();d.classList.add("is-on");d.setAttribute("aria-hidden","false");pintarPanel()}
   function pintarPanel(){
     var d=panel(),b=d.querySelector("#onl179body");
     var esperando=!!(soyAnfitrion()&&!arrancado&&sala&&estado!=="off"&&mundoListo);
@@ -3228,6 +3387,7 @@ var Online179=(function(){
     if(!transporteForzado)vigilarConexion();
   }
   function salir(){
+    borrarSala179();
     if(tMundo){clearInterval(tMundo);tMundo=null}
     for(var k in chunks){try{if(chunks[k].espera)clearTimeout(chunks[k].espera)}catch(e){}}
     chunks={};trozos179=null;mundoOk179=false;
@@ -3261,7 +3421,7 @@ var Online179=(function(){
   else setTimeout(autoArranque,0);
 
   return {
-    abrir:abrirPanel,puerta:puerta,resultado:resultado,nota179:nota179,repinta179:repinta179,
+    abrir:abrirOnline179,musicaMenu:musicaMenu179,puerta:puerta,resultado:resultado,nota179:nota179,repinta179:repinta179,
     difundir:difundir,activo:activo,soyAnfitrion:soyAnfitrion,salir:salir,crear:crear,unir:unir,
     cerrarPuerta:reset,estado:function(){return estado},club:function(){return club},rival:function(){return rival},sala:function(){return sala},aviso:function(){return aviso},
     pasoPendiente:function(){var p=pasoPendiente();return p?{paso:p.paso,yo:!!p.P.yo,el:!!p.P.el,hecho:!!p.P.hecho,modoYo:p.P.modoYo,modoEl:p.P.modoEl}:null},
@@ -3278,6 +3438,7 @@ try{window.Online179=Online179}catch(e){}
   if(!btn)return;
   btn.addEventListener("click",function(){
     try{if(window.Sfx&&Sfx.ok)Sfx.ok()}catch(e){}
+    try{if(window.Online179&&Online179.musicaMenu)Online179.musicaMenu()}catch(e){}
     if(window.Carrera&&window.Carrera.fijarSlot)window.Carrera.fijarSlot("online",function(){window.Online179.abrir()});
     else window.Online179.abrir();
   });
