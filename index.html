@@ -2264,7 +2264,8 @@ var Online179=(function(){
   var estado="off", aviso="", etiqueta="";
   var puertas={}, seq=0, tEnvio=0, importando=false, arrancado=false;
   var ultimoSello="", pausaHasta=0, enviosAuto=0, tPrimerEnvio=0;
-  var transporteForzado=null, silencio179=false, callarHasta179=0, cargando179=false, chunks={}, trozos179=null, tMundo=null, mundoOk179=false, mundoListo=false, reintentarVisible=false, salaLista=false, invitado179=null, selector179=null, selectorAbierto179=false;
+  var transporteForzado=null, silencio179=false, callarHasta179=0, cargando179=false, chunks={}
+  var ultimoDelOtro=0, yo179=String(Math.random()).slice(2,10), trozos179=null, tMundo=null, mundoOk179=false, mundoListo=false, reintentarVisible=false, salaLista=false, invitado179=null, selector179=null, selectorAbierto179=false;
   var TAM=24000;
   var PERSONALES={partido:1,copa:1,playoff:1};
 
@@ -2273,6 +2274,8 @@ var Online179=(function(){
     var c=Car();
     return estado==="listo"&&!!rol&&!!club&&!!(c&&c._estado&&c._estado());
   }
+  function enOnline(){try{var c=Car();return !!(c&&c.slot&&c.slot()==="online")}catch(e){return false}}
+  function elDentro(){return (Date.now()-ultimoDelOtro)<15000}
   function soyAnfitrion(){return rol==="anfitrion"}
   function toast(t,ms){try{if(typeof window.toast==="function")window.toast(t,ms||2200)}catch(e){}}
 
@@ -2298,6 +2301,7 @@ var Online179=(function(){
   /* ---------------- envío (con troceo) ---------------- */
   function emandar(txt){try{if(T&&typeof T.enviar==="function")T.enviar(txt)}catch(e){}}
   function enviar(o){
+    try{o.y=yo179}catch(e){}
     var t;try{t=JSON.stringify(o)}catch(e){return}
     if(t.length<=TAM){emandar(t);return}
     var id=++seq,n=Math.ceil(t.length/TAM);
@@ -2738,12 +2742,16 @@ var Online179=(function(){
       if(arrancado)setTimeout(function(){difundir({tipo:"mundo",club:club})},900);
       else arrancarMundo();
     }
+    repinta179();
     pintarPanel();
   }
 
   /* ---------------- recepción ---------------- */
   function recibir(m){
     if(!m||!m.t)return;
+    if(m.y===yo179)return;             // lo que he mandado yo
+    ultimoDelOtro=Date.now();
+    if(m.t==="ping")return;
     if(m.t==="hola"){
       if(soyAnfitrion()){
         if(m.club)rival=m.club;
@@ -2977,6 +2985,14 @@ var Online179=(function(){
     });
   }
   function puerta(paso,datos,ejecutar,boton){
+    // se mira y se juega sin el amigo, pero lo que cambia la partida de los
+    // dos necesita a los dos dentro
+    if(enOnline()&&!PERSONALES[paso]&&(!activo()||!elDentro())){
+      if(boton)marcar(boton,paso);
+      try{toast(paso==="cerrar"?"Necesitas a tu amigo para cerrar la temporada.":"Necesitas a tu amigo para pasar de d\xEDa.",3400)}catch(e){}
+      repinta179();
+      return;
+    }
     if(!activo()){if(ejecutar)ejecutar();return}
     var P=P0(paso);
     if(P.hecho&&!PERSONALES[paso])reset(paso);
@@ -3164,6 +3180,10 @@ var Online179=(function(){
           b.disabled=true;
           if(b.dataset)b.dataset.on179="1";
           b.textContent="Esperando… "+nn+"/2";
+        }else if(enOnline()&&!PERSONALES[k]&&(!activo()||!elDentro())){
+          b.disabled=true;
+          if(b.dataset)b.dataset.on179="1";
+          b.textContent=activo()?"Necesitas a tu amigo":"Sin conexi\xF3n con tu amigo";
         }else if(b.dataset&&b.dataset.on179){
           delete b.dataset.on179;
           b.disabled=false;
@@ -3417,6 +3437,20 @@ var Online179=(function(){
       unir(cod);
     },1200);
   }
+  // latido: así cada uno sabe si el otro está dentro
+  setInterval(function(){
+    if(estado==="listo"&&rol){try{enviar({t:"ping"})}catch(e){}}
+  },5000);
+  // la carrera se pinta cuando quiere, así que sin el amigo dentro los
+  // botones de los dos se repasan de vez en cuando
+  var ultimoDentro=null;
+  setInterval(function(){
+    if(!enOnline())return;
+    var d=!!(activo()&&elDentro());
+    if(d===ultimoDentro)return;
+    ultimoDentro=d;
+    try{repinta179()}catch(e){}
+  },1200);
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",autoArranque);
   else setTimeout(autoArranque,0);
 
@@ -3424,6 +3458,7 @@ var Online179=(function(){
     abrir:abrirOnline179,musicaMenu:musicaMenu179,puerta:puerta,resultado:resultado,nota179:nota179,repinta179:repinta179,
     difundir:difundir,activo:activo,soyAnfitrion:soyAnfitrion,salir:salir,crear:crear,unir:unir,
     cerrarPuerta:reset,estado:function(){return estado},club:function(){return club},rival:function(){return rival},sala:function(){return sala},aviso:function(){return aviso},
+    dentro:function(){return elDentro()},hace:function(){return Date.now()-ultimoDelOtro},
     pasoPendiente:function(){var p=pasoPendiente();return p?{paso:p.paso,yo:!!p.P.yo,el:!!p.P.el,hecho:!!p.P.hecho,modoYo:p.P.modoYo,modoEl:p.P.modoEl}:null},
     _prueba:function(t){transporteForzado=t},
     _relay:function(u){try{if(u==null)localStorage.removeItem("idraft179.relay");else localStorage.setItem("idraft179.relay",String(u))}catch(e){}},
