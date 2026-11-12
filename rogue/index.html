@@ -1741,16 +1741,19 @@ const Logic = (() => {
       let banda = 0;
       if (m.wide) {
         banda = m.band === 'lateral' ? 4.6 : 2.2;
+        // v189: el pase atras a la banda deja de ser gratis; el bonus baja con el terreno que se pierde
+        if (prog < 0) banda -= Math.min(3.4, -prog * 0.4);
         if (p.wide && m.flank !== p.flank) banda += 1.2;    // cambio de banda
         else if (!p.wide) banda += 0.6;                     // abrir el juego a un compañero abierto
         if (m.band === 'lateral') banda += prog > 6 ? 1.5 : prog > 0 ? 0.7 : 0;  // el lateral se incorpora
       }
       // Circular hacia atrás por banda no es perder terreno: se penaliza menos
       // v177: avanzar suma más y el pase atrás resta, también en banda
-      const progW = m.band === 'lateral' ? (prog >= 0 ? prog * 0.35 : prog * 0.14)
-        : m.wide ? (prog >= 0 ? prog * 0.35 : prog * 0.4)
+      const progW = m.band === 'lateral' ? (prog >= 0 ? prog * 0.35 : prog * 0.35)
+        : m.wide ? (prog >= 0 ? prog * 0.35 : prog * 0.5)
         : (prog >= 0 ? prog * 0.4 : prog * 1.05);
-      const sc = Math.min(open, 7) + progW + banda - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
+      const regalo = prog < -6 ? (prog + 6) * 0.35 : 0;   // v189: devolverla veinte metros no puede salir gratis
+      const sc = Math.min(open, 7) + progW + banda + regalo - laneBlock(s, p, m.x, m.y, 1.1, false) * 5 - distancePenalty - (isOffside(s, m) ? 20 : 0);
       const cand = { p: m, score: sc, open, prog };
       if (!best || sc > best.score) best = cand;
       if (prog >= 0 && (!delante || sc > delante.score)) delante = cand;   // v177: mejor opción hacia delante
@@ -1802,9 +1805,21 @@ const Logic = (() => {
       const m = bestPassTarget(s, p), mine = Math.min(nd, 7);
       // v176: con un compañero de banda libre, se le busca antes (aunque no sea el pase perfecto)
       const bandaLibre = m && m.p.wide && m.open > 4.5;
-      if (m && m.score > 0 && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || (bandaLibre && rnd() < 0.3 * smart) || rnd() < 0.04)) {
+      // v189: con aire, el balon no se devuelve. Antes, en cuanto el portador no
+      // veia nada claro soltaba el balon hacia atras y el ataque volvia a empezar.
+      const atras = m ? (m.prog || 0) < -0.5 : false;
+      const aire = Math.max(0, Math.min(1, (nd - 2.2) / 2.6));   // 0 acorralado · 1 con todo el aire
+      const sigo = atras && aire > 0.45 && rnd() < 0.8;
+      if (m && m.score > 0 && !sigo && ((nd < 2.8 && rnd() < 0.5 + 0.4 * smart) || (m.score > mine + 2.5 && rnd() < 0.4 * smart) || (bandaLibre && rnd() < 0.3 * smart) || rnd() < 0.04)) {
         const ahead2 = depthOf(p.team, m.p.y) > depthOf(p.team, p.y) + 3;
         pass(s, p, ahead2 && m.open > 3 && rnd() < 0.65 ? 'through' : 'strong', { x: m.p.x - p.x, y: m.p.y - p.y }, 0, s.settings.spectator ? m.p.id : null); return;
+      }
+      if (sigo) {
+        p.think = (rival ? s.diff.think : 0.3) * (0.5 + rnd() * 0.5);
+        if ((p.dribbleCd || 0) <= 0 && rnd() < (s.settings.spectator ? 0.5 : 0.32)) {
+          const dir = Math.atan2(goalY - p.y, cx - p.x);
+          dribble(s, p, { x: Math.cos(dir), y: Math.sin(dir) }); return;
+        }
       }
     }
     // Conducción: hacia la portería buscando el hueco más libre y lejos de la banda
