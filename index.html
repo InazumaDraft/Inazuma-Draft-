@@ -140,6 +140,13 @@ function _createForOfIteratorHelper(r,e){var t="undefined"!=typeof Symbol&&r[Sym
   scroll-behavior:auto;
 }
 .cr-tabs{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x}
+/* v189: mientras el deslizamiento lo movia el propio juego daba igual que las
+   filas y los botones llevaran touch-action:none. Ahora manda el navegador, y
+   con none el dedo que empieza sobre una fila o un boton no mueve la lista.
+   Con pan-y se sigue evitando el zoom por doble toque y el realce azul. */
+.cr-body,.cr-body *,.cr-sheet-in,.cr-sheet-in *,.mend,.mend *,.sheet,.sheet *,
+.cp-grid,.cp-grid *,.cp-side,.cp-side *,.careerPick,.careerPick *,
+.crd-body,.crd-body *,.crd-feed,.crd-feed *,.crd-scorers,.crd-scorers *{touch-action:pan-y}
 </style>
 <style>
 /* v189: boton "ver movimientos" junto al presupuesto de cada equipo. */
