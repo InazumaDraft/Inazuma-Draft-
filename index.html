@@ -3149,41 +3149,42 @@ var Online179=(function(){
   function marcar(b,paso){
     var P=P0(paso);
     var n=(P.yo?1:0)+(P.el?1:0);
-    try{if(b&&b.tagName){b.disabled=true;b.dataset.on179="1";b.textContent="Esperando… "+n+"/2"}}catch(e){}
+    try{if(b&&b.tagName){b.disabled=true;b.dataset.on179="1";marca179(b,n+"/2")}}catch(e){}
+  }
+  // el contador va pegado al boton, en linea: ni tapa ni se mueve
+  function marca179(b,txt){
+    try{
+      var s=b.nextSibling,hay=null;
+      while(s){ if(s.classList&&s.classList.contains("onl179n")){hay=s;break} s=s.nextSibling }
+      if(!txt){ if(hay&&hay.parentNode)hay.parentNode.removeChild(hay); return }
+      if(!hay){
+        hay=document.createElement("span");
+        hay.className="onl179n";
+        hay.setAttribute("aria-live","polite");
+        hay.style.cssText="display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;font:800 12px/1.5 system-ui,sans-serif;background:#0d3f1e;color:#eaffea;border:2px solid #2f9c4c;vertical-align:middle;white-space:nowrap";
+        if(b.parentNode)b.parentNode.insertBefore(hay,b.nextSibling);
+      }
+      hay.textContent=txt;
+    }catch(e){}
   }
   function repinta179(){
     var pen=pasoPendiente();
-    var badge=document.getElementById("onl179badge");
-    if(!activo()){if(badge)badge.hidden=true;return}
-    if(!badge){
-      badge=document.createElement("div");
-      badge.id="onl179badge";badge.className="onl179badge";
-      document.body.appendChild(badge);
-    }
-    badge.hidden=false;
-    if(pen){
-      var n=(pen.P.yo?1:0)+(pen.P.el?1:0);
-      badge.innerHTML='<span class="onl179sp"></span><b>'+esc(textoEspera(pen.paso))+'</b><i>'+n+'/2</i>';
-    }else if(aviso){
-      badge.innerHTML='<span class="onl179sp"></span><b>'+esc(aviso)+'</b>';
-    }else{
-      badge.innerHTML='<span class="onl179ok"></span><b>Online</b><i>'+esc(Car()?Car().nombre(club):"")+'</i>';
-    }
     Object.keys(SEL).forEach(function(k){
       var Q=puertas[k];
-      var on=!!(Q&&Q.yo&&!Q.hecho);
+      var on=!!(Q&&!Q.hecho&&(Q.yo||Q.el));   // lo ven los dos: el que espera y el que falta
       var nodos=document.querySelectorAll(SEL[k]);
       for(var i=0;i<nodos.length;i++){
         var b=nodos[i];
         if(on){
           var nn=(Q.yo?1:0)+(Q.el?1:0);
-          b.disabled=true;
           if(b.dataset)b.dataset.on179="1";
-          b.textContent="Esperando… "+nn+"/2";
+          b.disabled=!!Q.yo;       // el que ya ha pulsado espera; el otro, a pulsar
+          marca179(b,nn+"/2");
         }else if(enOnline()&&!PERSONALES[k]&&(!activo()||!elDentro())){
           b.disabled=true;
           if(b.dataset)b.dataset.on179="1";
           b.textContent=activo()?"Necesitas a tu amigo":"Sin conexi\xF3n con tu amigo";
+          marca179(b,null);
         }else if(b.dataset&&b.dataset.on179){
           delete b.dataset.on179;
           b.disabled=false;
@@ -3196,6 +3197,7 @@ var Online179=(function(){
           else if(b.dataset.acc==="jugarplayoff")b.textContent="Jugar mi playoff";
           else if(b.dataset.acc==="simularplayoff")b.textContent="Simular playoff";
           else if(b.dataset.acc==="cerrar")b.textContent="Cerrar temporada";
+          marca179(b,null);
         }
       }
     });
@@ -3423,7 +3425,7 @@ var Online179=(function(){
     try{if(c&&c.fijarSlot)c.fijarSlot("",function(){})}catch(e){}
     try{if(window.refrescarMenuCarrera)window.refrescarMenuCarrera()}catch(e){}
     cerrarPanel();
-    var b=document.getElementById("onl179badge");if(b)b.hidden=true;
+    try{var bq=document.getElementById("onl179badge");if(bq&&bq.parentNode)bq.parentNode.removeChild(bq)}catch(e){}
   }
 
   /* ---------------- enlace de invitación ---------------- */
@@ -3439,6 +3441,7 @@ var Online179=(function(){
       unir(cod);
     },1200);
   }
+  try{var bx=document.getElementById("onl179badge");if(bx&&bx.parentNode)bx.parentNode.removeChild(bx)}catch(e){}
   // latido: así cada uno sabe si el otro está dentro
   setInterval(function(){
     if(estado==="listo"&&rol){try{enviar({t:"ping"})}catch(e){}}
