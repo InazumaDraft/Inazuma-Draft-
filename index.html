@@ -2833,6 +2833,7 @@ var Online179=(function(){
     callarHasta179=Date.now()+1500;
     aceptarSello();
     if(!ok){cambiarEstado("error","No se ha podido cargar la partida.");return}
+    sellarCarrera179();
     arrancado=true;mundoListo=true;   // el invitado ya está dentro: que viva
     mundoOk179=true;
     silencio179=false;          // ya tengo el mundo bueno: puedo hablar
@@ -2876,6 +2877,7 @@ var Online179=(function(){
     c.fijarSlot("online",function(){
       c.humanos(clubes);
       if(!mundoListo){try{c.nuevaCon(club);mundoListo=true}catch(e){}}
+      sellarCarrera179();
       difundir({tipo:"mundo",club:club});
       cambiarEstado("listo","Conectados.");
       aviso="";
@@ -3313,8 +3315,11 @@ var Online179=(function(){
       },3500);
     }
   }
+  function sellarCarrera179(){var c=Car();if(!c||!sala)return;try{var e=c._estado();if(!e)return;e.sala179=String(sala);try{if(c.guardarFinal149)c.guardarFinal149()}catch(e2){}}catch(e3){}}
+  function salaDeLaCarrera179(){try{var g=salaGuardada();if(!g)return false;var ks=["inazuma.carrera.online","inazuma.carrera.online.actual149","inazuma.carrera.online.respaldo"];for(var i=0;i<ks.length;i++){var t=localStorage.getItem(ks[i]);if(!t)continue;var o=JSON.parse(t);if(o&&o.sala179)return String(o.sala179)===String(g.s)}return false}catch(e){return false}}
+  function olvidarCarreraOnline179(){borrarSala179();var c=Car();try{if(c&&c.fijarSlot)c.fijarSlot("online",function(){try{if(c.borrar)c.borrar()}catch(e){}})}catch(e){}}
   function abrirOnline179(){
-    if(!activo()&&salaGuardada()&&Car()&&Car().hayEn&&Car().hayEn("online")){continuar179();return}
+    if(!activo()&&salaGuardada()&&Car()&&Car().hayEn&&Car().hayEn("online")){if(salaDeLaCarrera179()){continuar179();return}olvidarCarreraOnline179();}
     abrirPanel();
   }
   function abrirPanel(){musicaMenu179();var d=panel();d.classList.add("is-on");d.setAttribute("aria-hidden","false");pintarPanel()}
@@ -3421,6 +3426,7 @@ var Online179=(function(){
             c.fijarSlot("online",function(){
               c.humanos([id]);
               if(!mundoListo){try{c.nuevaCon(id);mundoListo=true}catch(e2){mundoListo=false}}
+              sellarCarrera179();
               try{c._on.fijarVista("mercado");c.pintar()}catch(e3){}
             });
           }catch(e){}
