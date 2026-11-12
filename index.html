@@ -2658,7 +2658,7 @@ var Online179=(function(){
           salaLista=true;
           if(!rival)cambiarEstado("esperando","Listo. Pasa el c\\xF3digo a tu amigo.");
         }
-      }else if(!tBus){
+      }else if(!tBus&&!arrancado){   // al volver a entrar no hace falta buscar
         cambiarEstado("conectando","Buscando la partida\x2026");
         api.enviar(JSON.stringify({t:"busco"}));
         vecesBus=0;
@@ -3276,9 +3276,11 @@ var Online179=(function(){
       conectar();
       vigilarConexion();
       // si su amigo no aparece, tira con la suya y a jugar
+      // si a los 3,5 segundos no ha llegado la partida de su amigo, tira con
+      // la suya: mejor entrar y mirar que quedarse esperando en la puerta
       setTimeout(function(){
-        if(activo()&&!mundoOk179)abrirMiPartida179();
-      },9000);
+        if(!mundoOk179)abrirMiPartida179();
+      },3500);
     }
   }
   function abrirOnline179(){
