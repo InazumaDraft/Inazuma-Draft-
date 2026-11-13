@@ -3316,10 +3316,17 @@ var Online179=(function(){
     }
   }
   function sellarCarrera179(){var c=Car();if(!c||!sala)return;try{var e=c._estado();if(!e)return;e.sala179=String(sala);try{if(c.guardarFinal149)c.guardarFinal149()}catch(e2){}}catch(e3){}}
-  function salaDeLaCarrera179(){try{var g=salaGuardada();if(!g)return false;var ks=["inazuma.carrera.online","inazuma.carrera.online.actual149","inazuma.carrera.online.respaldo"];for(var i=0;i<ks.length;i++){var t=localStorage.getItem(ks[i]);if(!t)continue;var o=JSON.parse(t);if(o&&o.sala179)return String(o.sala179)===String(g.s)}return false}catch(e){return false}}
+  function textoOnline179(){try{var ks=["inazuma.carrera.online","inazuma.carrera.online.actual149","inazuma.carrera.online.respaldo"];for(var i=0;i<ks.length;i++){var t=localStorage.getItem(ks[i]);if(t)return t}return null}catch(e){return null}}
+  function desnudo179(t){try{var o=JSON.parse(t);if(!o)return null;delete o.guardado149;delete o.sala179;return JSON.stringify(o)}catch(e){return null}}
+  function carreraOnlineDeFiar179(){var g=salaGuardada();if(!g)return false;
+    var on=textoOnline179();if(!on)return false;
+    try{var fuera=localStorage.getItem("inazuma.carrera")||localStorage.getItem("inazuma.carrera.actual149")||"";if(fuera){var a=desnudo179(on),b2=desnudo179(fuera);if(a&&b2&&a===b2)return false}}catch(e){}
+    try{var o=JSON.parse(on);if(o&&o.sala179)return String(o.sala179)===String(g.s)}catch(e2){}
+    try{var o2=JSON.parse(on);return !!o2&&String(o2.mi)===String(g.c)}catch(e3){return false}
+  }
   function olvidarCarreraOnline179(){borrarSala179();var c=Car();try{if(c&&c.fijarSlot)c.fijarSlot("online",function(){try{if(c.borrar)c.borrar()}catch(e){}})}catch(e){}}
   function abrirOnline179(){
-    if(!activo()&&salaGuardada()&&Car()&&Car().hayEn&&Car().hayEn("online")){if(salaDeLaCarrera179()){continuar179();return}olvidarCarreraOnline179();}
+    if(!activo()&&salaGuardada()&&Car()&&Car().hayEn&&Car().hayEn("online")){if(carreraOnlineDeFiar179()){continuar179();return}olvidarCarreraOnline179();}
     abrirPanel();
   }
   function abrirPanel(){musicaMenu179();var d=panel();d.classList.add("is-on");d.setAttribute("aria-hidden","false");pintarPanel()}
